@@ -214,30 +214,3 @@ class JobBuilder():
             os.rmdir(self.temp_dir)
         except:
             print(("%s was not completely removed." % self.temp_dir))
-
-if __name__ == "__main__":
-    print("Starting job and makeflow builder")
-
-    mk_builder = MakeflowBuilder("Test")
-
-    print("Generating a new job")
-    jb = JobBuilder("/bin/bash",
-        input_dir="%s" % os.getcwd(),
-        remote_dir="/home/ubuntu/work/",
-        output_dir="/proj_data/results")
-
-    jb.add_file("test.txt", "")
-    jb.add_file("test2.txt", "")
-    jb.add_file("test3.txt", "")
-
-    job = jb.build_job(work_file="data-set.txt")
-    print("Job built")
-
-    mk_builder.add_option("-q devel")
-
-    print("Generating workflow")
-    mk_builder.add_job(job)
-    mk_builder.build_workflow()
-
-    print("Workflow built")
-    print("Done")
