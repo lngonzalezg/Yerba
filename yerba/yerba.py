@@ -1,0 +1,135 @@
+import argparse
+import heapq
+import json as js
+import logging
+import itertools
+import os
+import subprocess
+import sys
+import time
+import uuid
+
+import zmq
+
+from makeflow import (JobBuilder, MakeflowBuilder)
+
+REQUEST = 'request'
+DATA = 'data'
+
+ERROR = "-1"
+
+workflows = {}
+jex_queue = []
+counter = itertools.count()
+
+encoder = js.JSONEncoder()
+
+def build_workflow(workflow):
+    wb = MakeflowBuilder(workflow['name'])
+    jobs = workflow['jobs']
+
+    for job in jobs:
+        jb = JobBuilder(job['cmd'])
+        if 'inputs' in job:
+            jb.add_file_group(job['inputs'])
+
+        if 'outputs' in job:
+            jb.add_file_group(job['outputs'], remote=True)
+
+        wb.add_job(jb.build_job())
+
+    wb.build_workflow()
+    return "%s.makeflow" % workflow['name']
+
+def schedule_workflow(workflow):
+    makeflow = build_workflow(workflow)
+    count = next(counter)
+    id = str(uuid.uuid4().int)
+
+    entry = (0, count, [id, makeflow])
+    workflows[id] = entry
+    heapq.heappush(jex_queue, entry)
+    print(jex_queue)
+
+    return id
+    
+def run_workflow():
+    (priority, count, workflow) = heapq.heappop(jex_queue)
+    (id, makeflow) = workflow
+
+    print("Running workflow %s" % workflow)
+
+    try:
+        print(id)
+        subprocess.Popen("makeflow %s", workflow)
+    except:
+        logging.warn("Unable to run workflow.")
+
+def get_status(id):
+    print(id)
+    if id in workflows:
+        return encoder.encode({ "status" : "RUNNING"})
+    else:
+        return encoder.encode({ "status" : "NOT_FOUND"})
+  
+def dispatch(request, data):
+    if request == "get_status":
+        return get_status(data)
+    elif request == "schedule":
+        return schedule_workflow(data)
+
+def listen_forever(port):
+    context = zmq.Context()
+
+    socket = context.socket(zmq.REP)
+    socket.bind("tcp://*:%s" % port)
+
+    jd = js.JSONDecoder()
+
+    while True:
+        request = socket.recv()
+
+        try:
+            req_object = jd.decode(request)
+        except:
+            logging.warn("Request was not able to be decoded.")
+        
+        if req_object and REQUEST in req_object and DATA in req_object:
+            response = dispatch(req_object['request'], req_object['data'])
+
+        if response:
+            socket.send(response)
+        else:
+            socket.send(ERROR)
+        
+        if jex_queue:
+            run_workflow()
+
+        time.sleep(1)
+
+
+class WorkflowService():
+    def __init__(self):
+        pass
+
+    def get_status(self, workflow):
+        ''' Get the current status of the workflow.'''
+        pass
+
+    def create_workflow(self, workflow):
+        ''' Given a JSON workflow format it will construct the workflow.'''
+        pass
+    
+    def run_workflow(self, workflow):
+        ''' Executes a given workflow.'''
+        pass
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='Processes bioinformatic jobs.')
+
+    parser.add_argument('port')
+    args = parser.parse_args()
+
+    listen_forever(args.port)
