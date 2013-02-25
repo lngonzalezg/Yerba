@@ -123,14 +123,11 @@ class JobBuilder():
         outputs = []
         inputs = [script, self.cmd]
 
-        for (localfile, is_output, cache) in self.files:
-            if self.wildcard in localfile:
+        for (filename, is_output, cache) in self.files:
+            if self.wildcard in filename:
             #    ext_index = name.rfind(".")
             #    filename = filename.replace(self.wildcard, name[:ext_index])
                 filename = filename.replace(self.wildcard, self.prefix)
-
-            filename = os.path.basename(localfile)
-            remote = os.path.join(self.remote_dir, filename)
 
             if is_output:
                 outputs.append(filename)
@@ -187,12 +184,8 @@ class JobBuilder():
             output_name = os.path.join(self.output_dir, filename)
             output_file = (output_name, True, False)
             self.files.append(output_file)
-        elif any(exist) or (remote and found):
-            logging.warn(name + ": this result file already exists.")
-            success = False
-        elif not found and remote:
-            output_name = os.path.join(self.output_dir, filename)
-            output_file = (output_name, True, False)
+        elif remote:
+            output_file = (filename, True, False)
             self.files.append(output_file)
         elif found[0]:
             input_file = (filename, False, True)
