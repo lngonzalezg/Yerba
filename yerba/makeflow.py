@@ -44,7 +44,6 @@ class Job():
         self.script = script
         self.inputs = inputs
         self.outputs = outputs
-        self.inputs.append(script)
 
 class JobBuilder():
     def __init__(self, cmdline, input_dir="", remote_dir="", output_dir="",
@@ -96,8 +95,8 @@ class JobBuilder():
 
             # COMMAND
             cmd = self.cmd.replace("/", "_")
-            print("This is the cmd %s" % cmd)
-            cmdstring = "./%s %s $WORK_FILE" % (cmd, self.args)
+            args = self.args.replace("/", "_")
+            cmdstring = "./%s %s $WORK_FILE" % (cmd, args)
             cmd_status = 'echo "running %s"\n' % cmd
             fp.write(cmd_status)
             fp.write(self.append_newline(cmdstring))
@@ -122,7 +121,7 @@ class JobBuilder():
         # Add files to the Task
         # TODO: fix cache and remote
         outputs = []
-        inputs = [self.cmd]
+        inputs = [script, self.cmd]
 
         for (localfile, is_output, cache) in self.files:
             if self.wildcard in localfile:
@@ -133,7 +132,7 @@ class JobBuilder():
             filename = os.path.basename(localfile)
             remote = os.path.join(self.remote_dir, filename)
 
-            if cache:
+            if is_output:
                 outputs.append(filename)
             else:
                 inputs.append(filename)
