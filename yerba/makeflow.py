@@ -1,5 +1,7 @@
 import sys, os, logging, tempfile
 
+logger = logging.getLogger('makeflow')
+
 class MakeflowBuilder():
     ''' Generates a workflow.'''
     def __init__(self, workflow):
@@ -8,7 +10,7 @@ class MakeflowBuilder():
         self.options = ["BATCH_OPTIONS="]
 
     def build_workflow(self):
-        logging.info("Generating %s workflow", self.workflow)
+        logger.info("Generating %s workflow", self.workflow)
 
         try:
             fp = open("%s.makeflow" % self.workflow, 'w')
@@ -26,12 +28,12 @@ class MakeflowBuilder():
                 fp.write(workflow_job % (outputs, inputs, job.script))
 
         except Exception as e:
-            logging.warn("Unable to generate workflow %s" % self.workflow)
+            logger.warn("Unable to generate workflow %s" % self.workflow)
             return
         finally:
             fp.close()
 
-        logging.info("Generated %s.makeflow" % self.workflow)
+        logger.info("Generated %s.makeflow" % self.workflow)
 
     def add_option(self, value):
         self.options.append(value)
@@ -68,7 +70,7 @@ class JobBuilder():
         #if os.path.isfile(cmdpath):
         #    self.add_file(cmdpath)
         #else:
-        #    logging.warn(self.cmd + ": will not be added as a file.")
+        #    logger.warn(self.cmd + ": will not be added as a file.")
 
     def build_job(self, work_file=None):
         script_name = "worker-" + str(self.cur_id) + ".sh"
@@ -85,7 +87,7 @@ class JobBuilder():
                     self.files.append((wf, False, False))
                     fp.write(self.append_newline("export WORK_FILE=%s" % name))
                 else:
-                    logging.warn(name + ": not a valid file.")
+                    logger.warn(name + ": not a valid file.")
 
             # Generate prehooks
             for cmdstring in self.prehooks:
@@ -110,12 +112,12 @@ class JobBuilder():
                 fp.write("bash %s" % cmdstring)
         except Exception as e:
             print(("Exception: %s" % str(e)))
-            logging.warn(script_name + ": task could not be written.")
+            logger.warn(script_name + ": task could not be written.")
             return None
         finally:
             self.cur_id = self.cur_id + 1
             self.temp_files.append(script_name)
-            logging.info(script_name + " was added.")
+            logger.info(script_name + " was added.")
             fp.close()
 
         # Add files to the Task
@@ -156,9 +158,9 @@ class JobBuilder():
                     self.prehooks.append(self.append_newline(cmdstring))
                 else:
                     self.posthooks.append(self.append_newline(cmdstring))
-                logging.info(cmdstring + ": was successfully added for deployment.")
+                logger.info(cmdstring + ": was successfully added for deployment.")
             else:
-                logging.warn(cmd + ": will not be deployed.")
+                logger.warn(cmd + ": will not be deployed.")
 
     def add_file_group(self, files, source_dir="", remote=False):
         if not files:
@@ -194,7 +196,7 @@ class JobBuilder():
             input_file = (dfile, False, True)
             self.files.append(input_file)
         else:
-            logging.warn(name + ": does not exist.")
+            logger.warn(name + ": does not exist.")
             success = False
 
         return success

@@ -21,8 +21,25 @@ ERROR = "-1"
 workflows = {}
 jex_queue = []
 counter = itertools.count()
-
 encoder = js.JSONEncoder()
+
+# Setup Logging
+logger = logging.getLogger('yerba')
+logger.setLevel(logging.DEBUG)
+
+fmt = logging.Formatter('%(asctime)s %(name)s [%(levelname)s] %(message)s',
+                    datefmt='%m/%d/%Y %I:%M:%S')
+
+filehandler = logging.FileHandler('yerba.log')
+filehandler.setLevel(logging.DEBUG)
+filehandler.setFormatter(fmt)
+
+streamhandler = logging.StreamHandler()
+streamhandler.setLevel(logging.INFO)
+streamhandler.setFormatter(fmt)
+
+logger.addHandler(filehandler)
+logger.addHandler(streamhandler)
 
 def build_workflow(workflow, id):
     wb = MakeflowBuilder("%s-%s" % (workflow['name'], id))
@@ -65,7 +82,7 @@ def run_workflow():
                 os.path.abspath(makeflow))
     except Exception as e:
         print ("error: %s" % e)
-        logging.warn("Unable to run workflow.")
+        logger.warn("Unable to run workflow.")
 
 def get_status(id):
     if id in workflows:
@@ -83,7 +100,7 @@ def get_status(id):
                 status = line.split()[1]
 
         if status:
-            logging.info(status)
+            logger.info(status)
             return encoder.encode({ "status" : status})
         else:
             return encoder.encode({ "status" : "RUNNING"})
@@ -110,7 +127,7 @@ def listen_forever(port):
         try:
             req_object = jd.decode(request)
         except:
-            logging.warn("Request was not able to be decoded.")
+            logger.warn("Request was not able to be decoded.")
         
         if req_object and REQUEST in req_object and DATA in req_object:
             response = dispatch(req_object['request'], req_object['data'])
@@ -157,11 +174,6 @@ if __name__ == "__main__":
 
         if not isinstance(log_level, int):
             raise ValueError('Invalid log level: %s' % log_level)
-    else:
-        log_level = 'WARN'
-    
-    logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s',
-                        datefmt='%m/%d/%Y %I:%M:%S', filename="yerba.log",
-                        level=log_level)
+        logger.setLevel(log_level)
     
     listen_forever(args.port)
