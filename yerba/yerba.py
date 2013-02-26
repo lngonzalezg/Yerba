@@ -2,6 +2,7 @@ import argparse
 import heapq
 import json as js
 import logging
+import logging.handlers as loghandlers
 import itertools
 import os
 import subprocess
@@ -24,22 +25,26 @@ counter = itertools.count()
 encoder = js.JSONEncoder()
 
 # Setup Logging
-logger = logging.getLogger('yerba')
-logger.setLevel(logging.DEBUG)
+if os.path.exists("logging.conf"):
+   logging.config.fileConfig("logging.conf") 
+   logger = logging.getLogger('yerba')
+else:
+    logger = logging.getLogger('yerba')
+    logger.setLevel(logging.DEBUG)
 
-fmt = logging.Formatter('%(asctime)s %(name)s [%(levelname)s] %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S')
+    fmt = logging.Formatter('%(asctime)s %(name)s [%(levelname)s] %(message)s',
+                            datefmt='%m/%d/%Y %I:%M:%S')
 
-filehandler = logging.FileHandler('yerba.log')
-filehandler.setLevel(logging.DEBUG)
-filehandler.setFormatter(fmt)
+    filehandler = loghandlers.TimedRotatingFileHandler('yerba.log', 'midnight')
+    filehandler.setLevel(logging.DEBUG)
+    filehandler.setFormatter(fmt)
 
-streamhandler = logging.StreamHandler()
-streamhandler.setLevel(logging.INFO)
-streamhandler.setFormatter(fmt)
+    streamhandler = logging.StreamHandler()
+    streamhandler.setLevel(logging.INFO)
+    streamhandler.setFormatter(fmt)
 
-logger.addHandler(filehandler)
-logger.addHandler(streamhandler)
+    logger.addHandler(filehandler)
+    logger.addHandler(streamhandler)
 
 def build_workflow(workflow, id):
     wb = MakeflowBuilder("%s-%s" % (workflow['name'], id))
@@ -120,7 +125,6 @@ def listen_forever(port):
     socket.bind("tcp://*:%s" % port)
 
     jd = js.JSONDecoder()
-
     while True:
         request = socket.recv()
 
