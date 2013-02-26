@@ -24,8 +24,8 @@ counter = itertools.count()
 
 encoder = js.JSONEncoder()
 
-def build_workflow(workflow):
-    wb = MakeflowBuilder(workflow['name'])
+def build_workflow(workflow, id):
+    wb = MakeflowBuilder("%s-%s" % (workflow['name'], id))
     jobs = workflow['jobs']
 
     for job in jobs:
@@ -39,12 +39,12 @@ def build_workflow(workflow):
         wb.add_job(jb.build_job())
 
     wb.build_workflow()
-    return "%s.makeflow" % workflow['name']
+    return "%s-%s.makeflow" % (workflow['name'], id)
 
 def schedule_workflow(workflow):
-    makeflow = build_workflow(workflow)
-    count = next(counter)
     id = str(uuid.uuid4().int)
+    makeflow = build_workflow(workflow, id)
+    count = next(counter)
 
     entry = (0, count, [id, makeflow])
     workflows[id] = entry
@@ -60,15 +60,33 @@ def run_workflow():
     print("Running workflow %s" % workflow)
 
     try:
-        print(id)
-        subprocess.Popen("makeflow %s", workflow)
-    except:
+        print(makeflow)
+        os.popen("makeflow -T wq -N coge -a -C localhost:1024 %s &" %
+                os.path.abspath(makeflow))
+    except Exception as e:
+        print ("error: %s" % e)
         logging.warn("Unable to run workflow.")
 
 def get_status(id):
-    print(id)
     if id in workflows:
-        return encoder.encode({ "status" : "RUNNING"})
+        (priority, count, workflow) = workflows[id]
+        (id, makeflow) = workflow
+        
+        try:
+            lines = open("%s.makeflowlog" % makeflow).readlines()
+        except Exception as e:
+            print("Unable to open makeflow %s" % e)
+            return encoder.encode({ "status" : "RUNNING"})
+
+        for line in lines:
+            if line.startswith("#"):
+                status = line.split()[1]
+
+        if status:
+            print status
+            return encoder.encode({ "status" : status})
+        else:
+            return encoder.encode({ "status" : "RUNNING"})
     else:
         return encoder.encode({ "status" : "NOT_FOUND"})
   
