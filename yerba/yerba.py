@@ -12,7 +12,7 @@ import uuid
 
 import zmq
 
-from makeflow import (JobBuilder, MakeflowBuilder)
+from makeflow import MakeflowService
 
 REQUEST = 'request'
 DATA = 'data'
@@ -23,6 +23,7 @@ workflows = {}
 jex_queue = []
 counter = itertools.count()
 encoder = js.JSONEncoder()
+workflow_provider = MakeflowService()
 
 # Setup Logging
 if os.path.exists("logging.conf"):
@@ -46,69 +47,28 @@ else:
     logger.addHandler(filehandler)
     logger.addHandler(streamhandler)
 
-def build_workflow(workflow, id):
-    wb = MakeflowBuilder("%s-%s" % (workflow['name'], id))
-    jobs = workflow['jobs']
-
-    for job in jobs:
-        jb = JobBuilder(job['cmd'])
-        if 'inputs' in job:
-            jb.add_file_group(job['inputs'])
-
-        if 'outputs' in job:
-            jb.add_file_group(job['outputs'], remote=True)
-
-        wb.add_job(jb.build_job())
-
-    wb.build_workflow()
-    return "%s-%s.makeflow" % (workflow['name'], id)
-
 def schedule_workflow(workflow):
     id = str(uuid.uuid4().int)
-    makeflow = build_workflow(workflow, id)
+    makeflow = workflow_provider.create_workflow(workflow)
     count = next(counter)
 
     entry = (0, count, [id, makeflow])
     workflows[id] = entry
     heapq.heappush(jex_queue, entry)
-    print(jex_queue)
-
     return id
-    
-def run_workflow():
+
+def fetch_workflow():
     (priority, count, workflow) = heapq.heappop(jex_queue)
     (id, makeflow) = workflow
-
-    print("Running workflow %s" % workflow)
-
-    try:
-        print(makeflow)
-        os.popen("makeflow -T wq -N coge -a -C localhost:1024 %s &" %
-                os.path.abspath(makeflow))
-    except Exception as e:
-        print ("error: %s" % e)
-        logger.warn("Unable to run workflow.")
+    return makeflow
 
 def get_status(id):
     if id in workflows:
         (priority, count, workflow) = workflows[id]
         (id, makeflow) = workflow
-        
-        try:
-            lines = open("%s.makeflowlog" % makeflow).readlines()
-        except Exception as e:
-            print("Unable to open makeflow %s" % e)
-            return encoder.encode({ "status" : "RUNNING"})
-
-        for line in lines:
-            if line.startswith("#"):
-                status = line.split()[1]
-
-        if status:
-            logger.info(status)
-            return encoder.encode({ "status" : status})
-        else:
-            return encoder.encode({ "status" : "RUNNING"})
+        print makeflow
+        status = workflow_provider.get_status(makeflow)
+        return encoder.encode(status)
     else:
         return encoder.encode({ "status" : "NOT_FOUND"})
   
@@ -142,27 +102,9 @@ def listen_forever(port):
             socket.send(ERROR)
         
         if jex_queue:
-            run_workflow()
+            workflow_provider.run_workflow(fetch_workflow())
 
         time.sleep(1)
-
-
-class WorkflowService():
-    def __init__(self):
-        pass
-
-    def get_status(self, workflow):
-        ''' Get the current status of the workflow.'''
-        pass
-
-    def create_workflow(self, workflow):
-        ''' Given a JSON workflow format it will construct the workflow.'''
-        pass
-    
-    def run_workflow(self, workflow):
-        ''' Executes a given workflow.'''
-        pass
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

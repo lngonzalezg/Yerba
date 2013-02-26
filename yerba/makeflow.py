@@ -1,6 +1,8 @@
 import sys, os, logging, tempfile
 
-logger = logging.getLogger('makeflow')
+from services import WorkflowService
+
+logger = logging.getLogger('yerba.makeflow')
 
 class MakeflowBuilder():
     ''' Generates a workflow.'''
@@ -209,3 +211,49 @@ class JobBuilder():
             os.rmdir(self.temp_dir)
         except:
             print(("%s was not completely removed." % self.temp_dir))
+
+class MakeflowService(WorkflowService):
+    def get_status(self, workflow):
+        logfile = "%s.makeflowlog" % workflow
+        current_status = {"status" : "RUNNING" }
+
+        if not os.path.exists(logfile):
+            return current_status
+
+        try:
+            lines = open("%s.makeflowlog" % workflow).readlines()
+        except Exception as e:
+            logger.exception(e)
+
+        if lines:
+            for line in lines:
+                if line.startswith("#"):
+                    current_status['status'] = line.split()[1]
+
+        logger.info(current_status['status'])
+        return current_status
+
+    def create_workflow(self, workflow):
+        wb = MakeflowBuilder("%s" % (workflow['name']))
+        jobs = workflow['jobs']
+
+        for job in jobs:
+            jb = JobBuilder(job['cmd'])
+            if 'inputs' in job:
+                jb.add_file_group(job['inputs'])
+
+            if 'outputs' in job:
+                jb.add_file_group(job['outputs'], remote=True)
+
+            wb.add_job(jb.build_job())
+
+        wb.build_workflow()
+        return "%s.makeflow" % (workflow['name'])
+
+    def run_workflow(self, workflow):
+        try:
+            os.popen("makeflow -T wq -N coge -a -C localhost:1024 %s &" %
+                    os.path.abspath(workflow))
+        except:
+            logger.exception("Unable to run workflow")
+
