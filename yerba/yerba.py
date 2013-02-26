@@ -83,7 +83,7 @@ def get_status(id):
                 status = line.split()[1]
 
         if status:
-            print status
+            logging.info(status)
             return encoder.encode({ "status" : status})
         else:
             return encoder.encode({ "status" : "RUNNING"})
@@ -148,6 +148,20 @@ if __name__ == "__main__":
         description='Processes bioinformatic jobs.')
 
     parser.add_argument('port')
+    parser.add_argument('--log')
     args = parser.parse_args()
 
+
+    if args.log:
+        log_level = getattr(logging, args.log.upper(), None)
+
+        if not isinstance(log_level, int):
+            raise ValueError('Invalid log level: %s' % log_level)
+    else:
+        log_level = 'WARN'
+    
+    logging.basicConfig(format='%(asctime)s [%(levelname)s] %(message)s',
+                        datefmt='%m/%d/%Y %I:%M:%S', filename="yerba.log",
+                        level=log_level)
+    
     listen_forever(args.port)
