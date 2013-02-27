@@ -66,8 +66,8 @@ def get_status(id):
     if id in workflows:
         (priority, count, workflow) = workflows[id]
         (id, makeflow) = workflow
-        print makeflow
         status = workflow_provider.get_status(makeflow)
+        logger.info("%s is %s", makeflow, status['status'])
         return encoder.encode(status)
     else:
         return encoder.encode({ "status" : "NOT_FOUND"})
@@ -88,8 +88,12 @@ def listen_forever(port):
     while True:
         request = socket.recv()
 
+        req_object = None
+        response = None
+
         try:
-            req_object = jd.decode(request)
+            request_string = request.decode("ascii")
+            req_object = jd.decode(request_string)
         except:
             logger.warn("Request was not able to be decoded.")
         
@@ -97,11 +101,12 @@ def listen_forever(port):
             response = dispatch(req_object['request'], req_object['data'])
 
         if response:
-            socket.send(response)
+            socket.send_unicode(response)
         else:
-            socket.send(ERROR)
+            socket.send_unicode(ERROR)
         
         if jex_queue:
+            logger.info("Fetching new workflow to run.")
             workflow_provider.run_workflow(fetch_workflow())
 
         time.sleep(1)

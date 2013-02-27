@@ -41,7 +41,8 @@ class MakeflowBuilder():
         self.options.append(value)
 
     def add_job(self, job):
-        self.jobs.append(job)
+        if job:
+            self.jobs.append(job)
 
 class Job():
     def __init__(self, outputs, inputs, script):
@@ -98,10 +99,10 @@ class JobBuilder():
                 fp.write("bash %s" % cmdstring)
 
             # COMMAND
-            cmd = self.cmd.replace("/", "_")
+            logger.debug("Arguments: %s", self.args)
             args = self.args.replace("/", "_")
-            cmdstring = "./%s %s $WORK_FILE" % (cmd, args)
-            cmd_status = 'echo "running %s"\n' % cmd
+            cmdstring = "%s %s $WORK_FILE" % (self.cmd, args)
+            cmd_status = 'echo "running %s"\n' % self.cmd
             fp.write(cmd_status)
             fp.write(self.append_newline(cmdstring))
 
@@ -125,7 +126,7 @@ class JobBuilder():
         # Add files to the Task
         # TODO: fix cache and remote
         outputs = []
-        inputs = [script, self.cmd]
+        inputs = [script]
 
         for (filename, is_output, cache) in self.files:
             if self.wildcard in filename:
@@ -142,6 +143,14 @@ class JobBuilder():
             #worker.specify_file(localfile, filename,
             #    type=queue_type, cache=cache)
 
+    
+        # FIXME: Remove this so that job won't build if required files
+        # dont exist.
+        if len(inputs) < 2:
+            logger.warn("Unable to build job: %s", self.cmd) 
+            return None
+
+        logger.info("Built job %s", self.cmd)
         return Job(outputs, inputs, script)
 
     def append_newline(self, string):
@@ -215,13 +224,14 @@ class JobBuilder():
 class MakeflowService(WorkflowService):
     def get_status(self, workflow):
         logfile = "%s.makeflowlog" % workflow
-        current_status = {"status" : "RUNNING" }
+        current_status = {"status" : "Scheduled" }
+        lines = None 
 
         if not os.path.exists(logfile):
             return current_status
 
         try:
-            lines = open("%s.makeflowlog" % workflow).readlines()
+            lines = open(logfile).readlines()
         except Exception as e:
             logger.exception(e)
 
@@ -251,6 +261,8 @@ class MakeflowService(WorkflowService):
         return "%s.makeflow" % (workflow['name'])
 
     def run_workflow(self, workflow):
+        logger.info("Running workflow: %s", workflow)
+
         try:
             os.popen("makeflow -T wq -N coge -a -C localhost:1024 %s &" %
                     os.path.abspath(workflow))
