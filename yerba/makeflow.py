@@ -14,6 +14,7 @@ class MakeflowBuilder():
     def build_workflow(self):
         logger.info("Generating %s workflow", self.workflow)
 
+        fp = None
         try:
             fp = open("%s.makeflow" % self.workflow, 'w')
             fp.write("RUN=/bin/bash\n")
@@ -28,12 +29,10 @@ class MakeflowBuilder():
                 outputs = " ".join(job.outputs)
                 inputs = " ".join(job.inputs)
                 fp.write(workflow_job % (outputs, inputs, job.script))
-
+            fp.close()
         except Exception as e:
             logger.warn("Unable to generate workflow %s" % self.workflow)
             return
-        finally:
-            fp.close()
 
         logger.info("Generated %s.makeflow" % self.workflow)
 
@@ -181,6 +180,10 @@ class JobBuilder():
             self.add_file(f, source_dir=source_dir, remote=remote)
 
     def add_file(self, filename, source_dir="", remote=False):
+        if not filename:
+            logging.warn("The filename was NoneType.")
+            return False
+
         filename = filename.strip()
         name = os.path.basename(filename)
         if source_dir:
