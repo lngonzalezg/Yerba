@@ -21,7 +21,7 @@ class MakeflowBuilder():
 
             # Add options
             if len(self.options) > 1:
-                fp.write(" ".join(self.options) + "\n")
+                fp.write(append_newline(" ".join(self.options)))
 
             # Add jobs
             workflow_job = "%s:%s\n\t$RUN %s\n"
@@ -50,29 +50,25 @@ class Job():
         self.outputs = outputs
 
 class JobBuilder():
-    def __init__(self, cmdline, input_dir="", remote_dir="", output_dir="",
-                 wildcard="*", prefix=""):
+    def __init__(self, cmd, args, script=None, input_dir="", remote_dir="",
+                 output_dir="", wildcard="*", prefix=""):
+
+        self.cmd = os.path.abspath(cmd)
+        self.script = script
+        self.args = args
 
         self.remote_dir = remote_dir
         self.output_dir = output_dir
         self.input_dir = input_dir
+
         self.prefix = prefix
+        self.wildcard = wildcard
         self.files = []
         self.prehooks = []
         self.posthooks = []
         self.temp_files = []
         self.temp_dir = tempfile.mkdtemp(prefix="backend-")
-        self.wildcard = wildcard
         self.cur_id = 0
-
-        cmd, sep, self.args = cmdline.partition(" ")
-        cmdpath = os.path.abspath(cmd)
-        self.cmd = os.path.abspath(cmd)
-
-        #if os.path.isfile(cmdpath):
-        #    self.add_file(cmdpath)
-        #else:
-        #    logger.warn(self.cmd + ": will not be added as a file.")
 
     def build_job(self, work_file=None):
         script_name = "worker-" + str(self.cur_id) + ".sh"
@@ -80,14 +76,14 @@ class JobBuilder():
 
         try:
             fp = open(script, 'w+')
-            fp.write(self.append_newline("#!/bin/bash"))
+            fp.write(append_newline("#!/bin/bash"))
 
             if work_file:
                 name = os.path.basename(work_file).strip()
                 wf = os.path.join(self.input_dir, name)
                 if os.path.isfile(wf):
                     self.files.append((wf, False, False))
-                    fp.write(self.append_newline("export WORK_FILE=%s" % name))
+                    fp.write(append_newline("export WORK_FILE=%s" % name))
                 else:
                     logger.warn(name + ": not a valid file.")
 
@@ -99,11 +95,18 @@ class JobBuilder():
 
             # COMMAND
             logger.debug("Arguments: %s", self.args)
-            args = self.args.replace("/", "_")
-            cmdstring = "%s %s $WORK_FILE" % (self.cmd, args)
-            cmd_status = 'echo "running %s"\n' % self.cmd
+            argstring = ""
+
+            for (arg, value, makeflow_format) in self.args:
+                if int(makeflow_format) == 1:
+                    value = value.replace("/", "_")
+
+                argstring = ("%s %s %s" % (argstring, arg, value))
+
+            cmdstring = "%s %s $WORK_FILE" % (self.cmd, argstring)
+            cmd_status = append_newline('echo "running %s"' % self.cmd)
             fp.write(cmd_status)
-            fp.write(self.append_newline(cmdstring))
+            fp.write(append_newline(cmdstring))
 
             # Generate posthooks
             for cmdstring in self.posthooks:
@@ -112,15 +115,15 @@ class JobBuilder():
                 posthook_msg = 'echo "running %s"\n' % cmd.strip()
                 fp.write(posthook_msg)
                 fp.write("bash %s" % cmdstring)
+
+            fp.close()
         except Exception as e:
-            print(("Exception: %s" % str(e)))
-            logger.warn(script_name + ": task could not be written.")
+            logger.exception("%s could not be written.", script_name)
             return None
         finally:
             self.cur_id = self.cur_id + 1
             self.temp_files.append(script_name)
             logger.info(script_name + " was added.")
-            fp.close()
 
         # Add files to the Task
         # TODO: fix cache and remote
@@ -138,22 +141,14 @@ class JobBuilder():
             else:
                 inputs.append(filename)
 
-            # TODO: do we still need localfile name
-            #worker.specify_file(localfile, filename,
-            #    type=queue_type, cache=cache)
-
-    
-        # FIXME: Remove this so that job won't build if required files
-        # dont exist.
+        # FIXME: This check should be moved outside of this method.
         if len(inputs) < 2:
-            logger.warn("Unable to build job: %s", self.cmd) 
+            logger.warn("Unable to build job: %s", self.cmd)
             return None
 
         logger.info("Built job %s", self.cmd)
         return Job(outputs, inputs, script)
 
-    def append_newline(self, string):
-        return string + "\n"
 
     def add_hooks(self, hooks, source_dir="", before=True):
         if not hooks:
@@ -165,9 +160,9 @@ class JobBuilder():
 
             if self.add_file(cmd, source_dir=source_dir):
                 if before:
-                    self.prehooks.append(self.append_newline(cmdstring))
+                    self.prehooks.append(append_newline(cmdstring))
                 else:
-                    self.posthooks.append(self.append_newline(cmdstring))
+                    self.posthooks.append(append_newline(cmdstring))
                 logger.info(cmdstring + ": was successfully added for deployment.")
             else:
                 logger.warn(cmd + ": will not be deployed.")
@@ -228,7 +223,7 @@ class MakeflowService(WorkflowService):
     def get_status(self, workflow):
         logfile = "%s.makeflowlog" % workflow
         current_status = {"status" : "Scheduled" }
-        lines = None 
+        lines = None
 
         if not os.path.exists(logfile):
             return current_status
@@ -251,7 +246,16 @@ class MakeflowService(WorkflowService):
         jobs = workflow['jobs']
 
         for job in jobs:
-            jb = JobBuilder(job['cmd'])
+            cmdstring = job['cmdstring']
+            cmd = cmdstring['cmd']
+            script = cmdstring['script']
+            args = cmdstring['args']
+            
+            if script:
+                jb = JobBuilder(cmd, args, script=script)
+            else:
+                jb = JobBuilder(cmd, args)
+
             if 'inputs' in job:
                 jb.add_file_group(job['inputs'])
 
@@ -263,6 +267,9 @@ class MakeflowService(WorkflowService):
         wb.build_workflow()
         return "%s.makeflow" % (workflow['name'])
 
+    # TODO: The makeflow options should be configurable.
+    # @by Evan Briones
+    # @on 3/7/2013
     def run_workflow(self, workflow):
         logger.info("Running workflow: %s", workflow)
 
@@ -272,3 +279,5 @@ class MakeflowService(WorkflowService):
         except:
             logger.exception("Unable to run workflow")
 
+def append_newline(string):
+     return string + "\n"
