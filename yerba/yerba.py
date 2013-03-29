@@ -27,7 +27,7 @@ workflow_provider = MakeflowService()
 
 # Setup Logging
 if os.path.exists("logging.conf"):
-   logging.config.fileConfig("logging.conf") 
+   logging.config.fileConfig("logging.conf")
    logger = logging.getLogger('yerba')
 else:
     logger = logging.getLogger('yerba')
@@ -71,7 +71,7 @@ def get_status(id):
         return encoder.encode(status)
     else:
         return encoder.encode({ "status" : "NOT_FOUND"})
-  
+
 def dispatch(request, data):
     if request == "get_status":
         return get_status(data)
@@ -95,8 +95,8 @@ def listen_forever(port):
             request_string = request.decode("ascii")
             req_object = jd.decode(request_string)
         except:
-            logger.warn("Request was not able to be decoded.")
-        
+            logger.exception("Request was not able to be decoded.")
+
         if req_object and REQUEST in req_object and DATA in req_object:
             response = dispatch(req_object['request'], req_object['data'])
 
@@ -104,7 +104,7 @@ def listen_forever(port):
             socket.send_unicode(response)
         else:
             socket.send_unicode(ERROR)
-        
+
         if jex_queue:
             logger.info("Fetching new workflow to run.")
             workflow_provider.run_workflow(fetch_workflow())
@@ -126,5 +126,5 @@ if __name__ == "__main__":
         if not isinstance(log_level, int):
             raise ValueError('Invalid log level: %s' % log_level)
         logger.setLevel(log_level)
-    
+
     listen_forever(args.port)
