@@ -12,7 +12,7 @@ import uuid
 
 import zmq
 
-from managers import (ServiceManager, Scheduler)
+from managers import (ServiceManager)
 
 REQUEST = 'request'
 DATA = 'data'
