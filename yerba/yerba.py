@@ -12,7 +12,7 @@ import uuid
 
 import zmq
 
-from makeflow import MakeflowService
+from managers import (ServiceManager, Scheduler)
 
 REQUEST = 'request'
 DATA = 'data'
@@ -23,7 +23,6 @@ workflows = {}
 jex_queue = []
 counter = itertools.count()
 encoder = js.JSONEncoder()
-workflow_provider = MakeflowService()
 
 # Setup Logging
 if os.path.exists("logging.conf"):
@@ -47,27 +46,32 @@ else:
     logger.addHandler(filehandler)
     logger.addHandler(streamhandler)
 
-def schedule_workflow(workflow):
+def schedule_workflow(data):
     id = str(uuid.uuid4().int)
-    makeflow = workflow_provider.create_workflow(workflow)
+
+    workflow_service = ServiceManager.get("makeflow", "workflow")
+    workflow = workflow_service.create_workflow(data)
     count = next(counter)
 
-    entry = (0, count, [id, makeflow])
+    entry = (0, count, [id, workflow])
     workflows[id] = entry
     heapq.heappush(jex_queue, entry)
     return id
 
 def fetch_workflow():
-    (priority, count, workflow) = heapq.heappop(jex_queue)
-    (id, makeflow) = workflow
-    return makeflow
+    (priority, count, work) = heapq.heappop(jex_queue)
+    (id, workflow) = work
+    return workflow
 
 def get_status(id):
     if id in workflows:
-        (priority, count, workflow) = workflows[id]
-        (id, makeflow) = workflow
-        status = workflow_provider.get_status(makeflow)
-        logger.info("%s is %s", makeflow, status['status'])
+        (priority, count, worker) = workflows[id]
+        (id, workflow) = worker
+
+        workflow_service = ServiceManager.get("makeflow", group="workflow")
+        status = workflow_service.get_status(workflow)
+
+        logger.info("%s is %s", workflow, status['status'])
         return encoder.encode(status)
     else:
         return encoder.encode({ "status" : "NOT_FOUND"})
@@ -107,7 +111,8 @@ def listen_forever(port):
 
         if jex_queue:
             logger.info("Fetching new workflow to run.")
-            workflow_provider.run_workflow(fetch_workflow())
+            workflow_service = ServiceManager.get("makeflow", group="workflow")
+            workflow_service.run_workflow(fetch_workflow())
 
         time.sleep(1)
 
@@ -119,12 +124,15 @@ if __name__ == "__main__":
     parser.add_argument('--log')
     args = parser.parse_args()
 
-
     if args.log:
         log_level = getattr(logging, args.log.upper(), None)
 
         if not isinstance(log_level, int):
             raise ValueError('Invalid log level: %s' % log_level)
         logger.setLevel(log_level)
+
+    # Register services
+    ServiceManager.initialize()
+    ServiceManager.start()
 
     listen_forever(args.port)
