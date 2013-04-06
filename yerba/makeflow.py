@@ -49,7 +49,11 @@ def _format_args(args):
     argstring = ""
 
     for (arg, value, makeflow_format) in args:
-        val = os.path.basename(str(value))
+        if makeflow_format == 1:
+            val = os.path.basename(str(value))
+        else:
+            val = str(value)
+
         argstring = ("%s %s %s" % (argstring, arg, val))
 
     return argstring
