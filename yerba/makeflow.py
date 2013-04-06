@@ -15,7 +15,10 @@ class GeneratedFile(object):
             logging.exception('Unable to open file %s', filename);
 
     def __enter__(self):
-        return self.fp
+        if hasattr(self, 'fp'):
+            return self.fp
+        else:
+            return None
 
     def __exit__(self, *exc_info):
         self.fp.close()
