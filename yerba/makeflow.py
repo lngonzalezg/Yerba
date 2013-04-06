@@ -95,6 +95,13 @@ class Makeflow(Workflow):
         else:
             workflow.filepath = blob['filepath']
 
+        if 'logfile' in blob and blob['logfile']:
+            workflow.logfile = blob['logfile']
+        else:
+            logger.info("Using default log file.")
+            logname = "%s.log" % workflow.name
+            workflow.logfile = os.path.join(workflow.filepath, logname)
+
         for job in blob['jobs']:
             if 'cmdstring' not in job:
                 logger.warn("Invalid job.")
@@ -166,6 +173,11 @@ class MakeflowService(WorkflowService):
                 if line.startswith("#"):
                     current_status['status'] = line.split()[1]
 
+        if current_status['status'] == "COMPLETED":
+            with open(workflow.logfile, 'a') as fp:
+                fp.write("Finished workflow %s\n\n" % workflow.name)
+
+
         logger.info(current_status['status'])
         return current_status
 
@@ -180,6 +192,9 @@ class MakeflowService(WorkflowService):
     def run_workflow(self, workflow):
         logger.info("Running workflow: %s", workflow)
         try:
+            with open(workflow.logfile, 'a') as fp:
+                fp.write("Started workflow %s\n" % workflow.name)
+
             os.popen("makeflow -T wq -N coge -a -C localhost:1024 %s &" %
                     workflow)
         except:
