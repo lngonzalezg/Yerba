@@ -48,7 +48,7 @@ class ServiceManager(object):
     @classmethod
     def start(cls):
         """Starts the service manager """
-        for service in cls.services.itervalues():
+        for service in cls.services.values():
             if hasattr(service, 'initialize'):
                 service.initialize()
 
