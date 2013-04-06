@@ -10,6 +10,7 @@ import sys
 import time
 import uuid
 
+import shelve
 import zmq
 
 from managers import (ServiceManager)
@@ -47,29 +48,51 @@ else:
     logger.addHandler(streamhandler)
 
 def schedule_workflow(data):
-    id = str(uuid.uuid4().int)
-
+    """ Returns the job id"""
+    workflow_database = shelve.open("yerba")
     workflow_service = ServiceManager.get("makeflow", "workflow")
-    workflow = workflow_service.create_workflow(data)
-    count = next(counter)
 
-    entry = (0, count, [id, workflow])
-    workflows[id] = entry
-    heapq.heappush(jex_queue, entry)
-    return id
+    new_workflow = workflow_service.create_workflow(data)
+
+    #for (wid, workflow) in workflows.iteritems():
+    #    if new_workflow.name == workflow.name:
+    #        logger.info("Attached to workflow %s", wid)
+    #        return wid
+
+    if new_workflow.name in workflow_database:
+        (workflow_id, workflow) = workflow_database[new_workflow.name]
+
+        if workflow_id not in workflows:
+            workflows[workflow_id] = workflow
+            logger.info("Attached to workflow %s", workflow_id)
+    else:
+        workflow_id = str(uuid.uuid4().int)
+        count = next(counter)
+        entry = (0, count, workflow_id)
+
+        workflow_database[new_workflow.name] = (workflow_id, new_workflow)
+        workflows[workflow_id] = new_workflow
+        heapq.heappush(jex_queue, entry)
+
+    workflow_database.close()
+
+    return workflow_id
 
 def fetch_workflow():
-    (priority, count, work) = heapq.heappop(jex_queue)
-    (id, workflow) = work
-    return workflow
+    """ Fetches the job given the workflow_id"""
+    (priority, count, workflow_id) = heapq.heappop(jex_queue)
 
-def get_status(id):
-    if id in workflows:
-        (priority, count, worker) = workflows[id]
-        (id, workflow) = worker
+    return workflows[workflow_id]
+
+def get_status(workflow_id):
+    if workflow_id in workflows:
+        workflow = workflows[workflow_id]
 
         workflow_service = ServiceManager.get("makeflow", group="workflow")
         status = workflow_service.get_status(workflow)
+
+        if status['status'] == "COMPLETED":
+            del workflows[workflow_id]
 
         logger.info("%s is %s", workflow, status['status'])
         return encoder.encode(status)
