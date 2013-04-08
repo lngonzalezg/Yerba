@@ -54,11 +54,6 @@ def schedule_workflow(data):
 
     new_workflow = workflow_service.create_workflow(data)
 
-    #for (wid, workflow) in workflows.iteritems():
-    #    if new_workflow.name == workflow.name:
-    #        logger.info("Attached to workflow %s", wid)
-    #        return wid
-
     if new_workflow.name in workflow_database:
         (workflow_id, workflow) = workflow_database[new_workflow.name]
 
@@ -136,8 +131,6 @@ def listen_forever(port):
             logger.info("Fetching new workflow to run.")
             workflow_service = ServiceManager.get("makeflow", group="workflow")
             workflow_service.run_workflow(fetch_workflow())
-
-        time.sleep(1)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
