@@ -16,7 +16,8 @@ class StatusService(Service):
         4: "ABORTED",
         5: "STARTED",
         6: "SCHEDULED",
-        7: "ATTACHED"
+        7: "ATTACHED",
+        8: "ERROR"
     }
 
     def status_code(self, name):

@@ -5,10 +5,11 @@ from service import Service
 logger = logging.getLogger('yerba.workflow')
 
 class Workflow(object):
-    def __init__(self, name):
+    def __init__(self, name, priority=0):
         self.name = name
         self.options = []
         self.jobs = []
+        self.priority  = priority
 
     def add_job(self, jobs):
         if isinstance(jobs, list):

@@ -1,6 +1,6 @@
 import logging
 
-from makeflow import MakeflowService
+from service import (Service, StatusService)
 
 logger = logging.getLogger('yerba.manager')
 
@@ -9,6 +9,10 @@ SEPERATOR = '.'
 class ServiceManager(object):
     services = {}
     RUNNING = False
+
+    @classmethod
+    def running(cls):
+        return cls.RUNNING
 
     @classmethod
     def register(cls, service):
@@ -49,7 +53,7 @@ class ServiceManager(object):
     def start(cls):
         """Starts the service manager """
         for service in cls.services.values():
-            if hasattr(service, 'initialize'):
+            if isinstance(service, Service):
                 service.initialize()
 
         cls.RUNNING = True
@@ -63,5 +67,4 @@ class ServiceManager(object):
     @classmethod
     def initialize(cls, services=None):
         """Initializes default services to be used."""
-        ServiceManager.register(MakeflowService())
-
+        ServiceManager.register(StatusService())

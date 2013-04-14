@@ -5,14 +5,12 @@ import logging
 import logging.handlers as loghandlers
 import itertools
 import os
-import subprocess
-import sys
 import time
-import uuid
 
 import shelve
 import zmq
 
+from makeflow import MakeflowService
 from managers import (ServiceManager)
 
 REQUEST = 'request'
@@ -49,56 +47,75 @@ else:
 
 def schedule_workflow(data):
     """ Returns the job id"""
-    workflow_database = shelve.open("yerba")
     workflow_service = ServiceManager.get("makeflow", "workflow")
-
+    status_service = ServiceManager.get("status", "internal")
     new_workflow = workflow_service.create_workflow(data)
 
-    if new_workflow.name in workflow_database:
-        (workflow_id, workflow) = workflow_database[new_workflow.name]
+    status_code = status_service.SCHEDULED
 
-        if workflow_id not in workflows:
-            workflows[workflow_id] = workflow
-            logger.info("Attached to workflow %s", workflow_id)
+    if not new_workflow:
+        status_code = status_service.FAILED
+    elif new_workflow.name in workflows:
+        status_code = status_service.ATTACHED
     else:
-        workflow_id = str(uuid.uuid4().int)
-        count = next(counter)
-        entry = (0, count, workflow_id)
+        workflows[new_workflow.name] = new_workflow
 
-        workflow_database[new_workflow.name] = (workflow_id, new_workflow)
-        workflows[workflow_id] = new_workflow
+        # Add the workflow to the queue
+        count = next(counter)
+        entry = (new_workflow.priority, count, new_workflow.name)
         heapq.heappush(jex_queue, entry)
 
-    workflow_database.close()
+        # Persist the job to the shelve
+        #try:
+        #    workflow_database = shelve.open("yerba")
+        #    workflow_database[new_workflow.name] = new_workflow
+        #    workflow_database.close()
+        #except:
+        #    logging.exception("Unable store workflow in shelve.")
 
-    return workflow_id
+    return status_code
 
 def fetch_workflow():
-    """ Fetches the job given the workflow_id"""
-    (priority, count, workflow_id) = heapq.heappop(jex_queue)
+    """ Fetches the job for the given workflow_key"""
+    (priority, count, workflow_key) = heapq.heappop(jex_queue)
 
-    return workflows[workflow_id]
+    return workflows[workflow_key]
 
-def get_status(workflow_id):
-    if workflow_id in workflows:
-        workflow = workflows[workflow_id]
+def get_status(workflow_key):
+    status_service = ServiceManager.get("status", "internal")
 
-        workflow_service = ServiceManager.get("makeflow", group="workflow")
-        status = workflow_service.get_status(workflow)
+    if workflow_key in workflows:
+        workflow = workflows[workflow_key]
 
-        if status['status'] == "COMPLETED":
-            del workflows[workflow_id]
+        workflow_service = ServiceManager.get("makeflow", "workflow")
+        status_code = workflow_service.get_status(workflow)
+        status_message = status_service.status_message(status_code)
 
-        logger.info("%s is %s", workflow, status['status'])
-        return encoder.encode(status)
+        if status_code == status_service.COMPLETED:
+            del workflows[workflow_key]
+
+            #try:
+            #    workflow_database = shelve.open("yerba", writeback=True)
+            #    if workflow_key in workflow_database:
+            #        del workflow_database[workflow_key]
+            #    workflow_database.close()
+            #except:
+            #    logger.exception("Could not open shelve for writing")
+
+        logger.info("%s is %s", workflow, status_message)
     else:
-        return encoder.encode({ "status" : "NOT_FOUND"})
+        status_code = status_service.NOT_FOUND
+        status_message = status_service.status_message(status_code)
+
+    return status_code
 
 def dispatch(request, data):
     if request == "get_status":
-        return get_status(data)
+        status_code = get_status(data)
     elif request == "schedule":
-        return schedule_workflow(data)
+        status_code = schedule_workflow(data)
+
+    return encoder.encode({"status" : status_code})
 
 def listen_forever(port):
     context = zmq.Context()
@@ -107,6 +124,7 @@ def listen_forever(port):
     socket.bind("tcp://*:%s" % port)
 
     jd = js.JSONDecoder()
+    status_service = ServiceManager.get("status", "internal")
     while True:
         request = socket.recv()
 
@@ -121,11 +139,10 @@ def listen_forever(port):
 
         if req_object and REQUEST in req_object and DATA in req_object:
             response = dispatch(req_object['request'], req_object['data'])
-
-        if response:
-            socket.send_unicode(response)
         else:
-            socket.send_unicode(ERROR)
+            response = encoder.encode({"status" : status_service.ERROR})
+
+        socket.send_unicode(response)
 
         if jex_queue:
             logger.info("Fetching new workflow to run.")
@@ -150,5 +167,6 @@ if __name__ == "__main__":
     # Register services
     ServiceManager.initialize()
     ServiceManager.start()
+    ServiceManager.register(MakeflowService())
 
     listen_forever(args.port)
