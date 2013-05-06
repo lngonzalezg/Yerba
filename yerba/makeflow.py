@@ -1,264 +1,326 @@
-import sys, os, logging, tempfile
+import logging
+import os
 
-from services import WorkflowService
+from workflow import Workflow, WorkflowService, Job
+from managers import ServiceManager
 
 logger = logging.getLogger('yerba.makeflow')
 
-class MakeflowBuilder():
+class GeneratedFile(object):
+    __slots__ = ['fp']
+
+    def __init__(self, filename, options):
+        try:
+            self.fp = open(filename, options)
+        except:
+            logging.exception('Unable to open file %s', filename);
+
+    def __enter__(self):
+        if hasattr(self, 'fp'):
+            return self.fp
+        else:
+            return None
+
+    def __exit__(self, *exc_info):
+        self.fp.close()
+
+SEPERATOR = '->'
+FILE_LINE_FORMAT = "%s:%s\n"
+CMDLINE_FORMAT = "\t%s %s\n"
+
+def format_job(job):
+    job_string = (_format_fileline(job.inputs, job.outputs),
+                _format_cmdline(job.cmd, job.args))
+    return ''.join(job_string)
+
+def _format_fileline(inputs, outputs):
+    files = (_format_files(outputs), _format_files(inputs))
+    return FILE_LINE_FORMAT % files
+
+def _format_files(files):
+    return ' '.join(_format_file_mapping(f) for f in files)
+
+def _format_file_mapping(f):
+    return SEPERATOR.join((f, os.path.basename(f)))
+
+def _format_cmdline(cmd, args):
+    return CMDLINE_FORMAT % (cmd, _format_args(args))
+
+def _format_args(args):
+    argstring = ""
+
+    for (arg, value, makeflow_format) in args:
+        if makeflow_format == 1:
+            val = os.path.basename(str(value))
+        else:
+            val = str(value)
+
+        argstring = ("%s %s %s" % (argstring, arg, val))
+
+    return argstring
+
+def _parse_cmdstring(cmdstring):
+    cmd = None
+    script = None
+    args = None
+
+    if 'cmd' in cmdstring:
+        cmd = cmdstring['cmd']
+
+    if 'script' in cmdstring:
+        script = cmdstring['script']
+
+    if 'args' in cmdstring:
+        args = cmdstring['args']
+
+    return (cmd, script, args)
+
+
+class Makeflow(Workflow):
     ''' Generates a workflow.'''
-    def __init__(self, workflow):
-        self.workflow = workflow
-        self.jobs = []
-        self.options = ["BATCH_OPTIONS="]
 
-    def build_workflow(self):
-        logger.info("Generating %s workflow", self.workflow)
-
-        fp = None
-        try:
-            fp = open("%s.makeflow" % self.workflow, 'w+')
-            fp.write("RUN=/bin/bash\n")
-
-            # Add options
-            if len(self.options) > 1:
-                fp.write(append_newline(" ".join(self.options)))
-
-            # Add jobs
-            workflow_job = "%s:%s\n\t$RUN %s\n"
-            for job in self.jobs:
-                input_maps = ["->".join((name, os.path.basename(name))) for name in job.inputs]
-                output_maps = ["->".join((name, os.path.basename(name))) for name in job.outputs]
-
-                outputs = " ".join(output_maps)
-                inputs = " ".join(input_maps)
-
-                fp.write(workflow_job % (outputs, inputs, os.path.basename(job.script)))
-            fp.close()
-        except:
-            logger.exception("Unable to generate workflow %s", self.workflow)
-            return
-
-        logger.info("Generated %s.makeflow" % self.workflow)
-
-    def add_option(self, value):
-        self.options.append(value)
-
-    def add_job(self, job):
-        if job:
-            self.jobs.append(job)
-
-class Job():
-    def __init__(self, outputs, inputs, script):
-        self.inputs = inputs
-        self.outputs = outputs
-
-class JobBuilder():
-    def __init__(self, cmd, args, script=None, input_dir="", remote_dir="",
-                 output_dir="", wildcard="*", prefix=""):
-
-        self.cmd = os.path.abspath(cmd)
-        self.script = script
-        self.args = args
-
-        self.remote_dir = remote_dir
-        self.output_dir = output_dir
-        self.input_dir = input_dir
-
-        self.prefix = prefix
-        self.wildcard = wildcard
-        self.files = []
-        self.prehooks = []
-        self.posthooks = []
-        self.temp_files = []
-        self.temp_dir = tempfile.mkdtemp(prefix="backend-")
-        self.cur_id = 0
-
-    def build_job(self, work_file=None):
-        script_name = "worker-" + str(self.cur_id) + ".sh"
-        script = os.path.join(self.temp_dir, script_name)
-
-        try:
-            fp = open(script, 'w+')
-            fp.write(append_newline("#!/bin/bash"))
-
-            if work_file:
-                name = os.path.basename(work_file).strip()
-                wf = os.path.join(self.input_dir, name)
-                if os.path.isfile(wf):
-                    self.files.append((wf, False, False))
-                    fp.write(append_newline("export WORK_FILE=%s" % name))
-                else:
-                    logger.warn(name + ": not a valid file.")
-
-            # Generate prehooks
-            for cmdstring in self.prehooks:
-                prehook_msg = 'echo "running %s"\n' % cmdstring.strip()
-                fp.write(prehook_msg)
-                fp.write("bash %s" % cmdstring)
-
-            # COMMAND
-            logger.debug("Arguments: %s", self.args)
-            argstring = ""
-
-            for (arg, value, makeflow_format) in self.args:
-                val = os.path.basename(str(value))
-                argstring = ("%s %s %s" % (argstring, arg, val))
-
-            cmdstring = "%s %s $WORK_FILE" % (self.cmd, argstring)
-            cmd_status = append_newline('echo "running %s"' % self.cmd)
-            fp.write(cmd_status)
-            fp.write(append_newline(cmdstring))
-
-            # Generate posthooks
-            for cmdstring in self.posthooks:
-                arg_index = cmdstring.find(" ")
-                cmd = cmdstring[:arg_index]
-                posthook_msg = 'echo "running %s"\n' % cmd.strip()
-                fp.write(posthook_msg)
-                fp.write("bash %s" % cmdstring)
-
-            fp.close()
-        except:
-            logger.exception("The job %s was not written.", script_name)
-            return None
-        finally:
-            self.cur_id = self.cur_id + 1
-            self.temp_files.append(script_name)
-            logger.info(script_name + " was added.")
-
-        # Add files to the Task
-        # TODO: fix cache and remote
-        outputs = []
-        inputs = [script]
-
-        for (filename, is_output, cache) in self.files:
-            logging.info("Adding %s.", filename)
-            if self.wildcard in filename:
-            #    ext_index = name.rfind(".")
-            #    filename = filename.replace(self.wildcard, name[:ext_index])
-                filename = filename.replace(self.wildcard, self.prefix)
-
-            if is_output:
-                outputs.append(filename)
-            else:
-                inputs.append(filename)
-
-        # FIXME: This check should be moved outside of this method.
-        if len(inputs) < 2:
-            logger.warn("Unable to build job: %s", self.cmd)
+    @classmethod
+    def from_blob(cls, blob):
+        if 'name' not in blob:
+            logger.warn("Unspecified workflow name.")
             return None
 
-        logger.info("Built job %s", self.cmd)
-        return Job(outputs, inputs, script)
+        workflow = Makeflow(blob['name'])
 
+        if 'jobs' not in blob:
+            logger.warn("The workflow does not contain any jobs.")
+            return workflow
 
-    def add_hooks(self, hooks, source_dir="", before=True):
-        if not hooks:
-            return
-
-        for cmdstring in hooks:
-            cmdstring = cmdstring.strip()
-            cmd = cmdstring.split()[0]
-
-            if self.add_file(cmd, source_dir=source_dir):
-                if before:
-                    self.prehooks.append(append_newline(cmdstring))
-                else:
-                    self.posthooks.append(append_newline(cmdstring))
-                logger.info("[%s]: was successfully added for deployment.", cmdstring)
-            else:
-                logger.warn("[%s]: will not be deployed.", cmd)
-
-    def add_file_group(self, files, source_dir="", remote=False):
-        if not files:
-            return
-
-        for f in files:
-            self.add_file(f, source_dir=source_dir, remote=remote)
-
-    def add_file(self, filename, source_dir="", remote=False):
-        if not filename:
-            logging.warn("The filename was NoneType.")
-            return False
-
-        filename = filename.strip()
-        name = os.path.basename(filename)
-        if source_dir:
-            dfile = os.path.join(source_dir, name)
+        if 'filepath' not in blob:
+            logger.warn("Filepath for makeflow was not specified.")
         else:
-            dfile = name
+            workflow.filepath = blob['filepath']
 
-        found = [os.path.isfile(filename), os.path.isfile(dfile)]
-        success = True
-
-        exist = [os.path.basename(fn) == name for (fn, t, c) in self.files]
-
-        if remote and self.wildcard in filename:
-            output_name = os.path.join(self.output_dir, filename)
-            output_file = (output_name, True, False)
-            self.files.append(output_file)
-        elif remote:
-            output_file = (filename, True, False)
-            self.files.append(output_file)
-        elif found[0]:
-            input_file = (filename, False, True)
-            self.files.append(input_file)
-        elif found[1]:
-            input_file = (dfile, False, True)
-            self.files.append(input_file)
+        if 'logfile' in blob and blob['logfile']:
+            workflow.logfile = blob['logfile']
         else:
-            input_file = (filename, False, True)
-            logger.info("%s does not exist yet.", name)
+            logger.info("Using default log file.")
+            logname = "%s.log" % workflow.name
+            workflow.logfile = os.path.join(workflow.filepath, logname)
 
-        return success
+        workflow.restart = False
 
-class MakeflowService(WorkflowService):
-    def get_status(self, workflow):
-        logfile = "%s.makeflowlog" % workflow
-        current_status = {"status" : "Scheduled" }
-        lines = None
+        for job in blob['jobs']:
+            if 'cmdstring' not in job:
+                logger.warn("Invalid job.")
+                continue
 
-        if not os.path.exists(logfile):
-            return current_status
-
-        try:
-            lines = open(logfile).readlines()
-        except:
-            logger.exception("Unable to read makeflow file %s.", logfile)
-
-        if lines:
-            for line in lines:
-                if line.startswith("#"):
-                    current_status['status'] = line.split()[1]
-
-        logger.info(current_status['status'])
-        return current_status
-
-    def create_workflow(self, workflow):
-        wb = MakeflowBuilder("%s" % (workflow['name']))
-        jobs = workflow['jobs']
-
-        for job in jobs:
-            cmdstring = job['cmdstring']
-            cmd = cmdstring['cmd']
-            script = cmdstring['script']
-            args = cmdstring['args']
-
-            if script:
-                jb = JobBuilder(cmd, args, script=script)
-            else:
-                jb = JobBuilder(cmd, args)
+            (cmd, script, args) = _parse_cmdstring(job['cmdstring'])
+            new_job = Job(cmd, script, args)
 
             if 'inputs' in job:
-                jb.add_file_group(job['inputs'])
+                new_job.add_inputs(job['inputs'])
 
             if 'outputs' in job:
-                jb.add_file_group(job['outputs'], remote=True)
+                new_job.add_outputs(job['outputs'])
 
-            wb.add_job(cmd, script, args, inputs, ouputs)
+            if 'overwrite' in job and int(job['overwrite']):
+                workflow.restart = True
+                for output in job.outputs:
+                    if os.path.isfile(output):
+                        os.remove(output)
+            workflow.add_job(new_job)
 
-        wb.build_workflow()
-        return "%s.makeflow" % (workflow['name'])
+        return workflow
+
+
+    def generate(self):
+        """ Generates a makeflow file. """
+        logfile = "%s.makeflowlog" % str(self)
+        overwrite = False
+
+        if os.path.isfile(str(self)) and not overwrite:
+            logger.info("%s has already been generated.", self.name)
+            return
+
+        with GeneratedFile(str(self), 'w+') as fp:
+            # Add options
+            if self.options:
+                for opt in self.options:
+                   fp.write('%s\n' % opt)
+
+            for job in self.jobs:
+                fp.write(format_job(job))
+
+            logger.info("Generated %s" % self)
+
+    def cleanup(self):
+        """ Removes a makeflow log files. """
+        pass
+
+    def __str__(self):
+        makeflow = "%s.makeflow" % self.name
+
+        if hasattr(self, 'filepath'):
+            filename = os.path.join(self.filepath, makeflow)
+        else:
+            filename = os.path.abspath(makeflow)
+
+        return filename
+
+NODE_FIELD = "NODE"
+PARENTS_FIELD = "PARENTS"
+SOURCES_FIELD = "SOURCES"
+TARGETS_FIELD = "TARGETS"
+COMMAND_FIELD = "COMMAND"
+
+# Status fields
+WAITING_FIELD = "WAITING"
+STARTED_FIELD = "STARTED"
+COMPLETED_FIELD = "COMPLETED"
+ABORTED_FIELD = "ABORTED"
+FAILED_FIELD = "FAILED"
+
+class MakeflowLog():
+    def __init__(self, logfile):
+        self.logfile = logfile
+        self.runs = 0
+
+    def parse(self):
+        try:
+            lines = open(self.logfile).readlines()
+        except:
+            logger.exception("Unable to read makeflow log %s.", self.logfile)
+            return (None, None)
+
+        status_service = ServiceManager.get("status", "internal")
+
+        # Use two stacks to gather nodes
+        item_stack = []
+        node_stack = []
+
+        # status messages
+        status_messages = []
+
+        for line in lines:
+            if not line.startswith("#"):
+                status_messages.append(line.split())
+            else:
+                # Strip off comment character and split
+                items = line[1:].split()
+                field_type = items[0]
+                timestamp = int(items[1])
+
+                if field_type == STARTED_FIELD:
+                    self.started = timestamp
+                    self.status = status_service.STARTED
+                elif field_type == WAITING_FIELD:
+                    self.ended = timestamp
+                    self.status = status_service.WAITING
+                elif field_type == COMPLETED_FIELD:
+                    self.ended = timestamp
+                    self.status = status_service.COMPLETED
+                    self.runs = self.runs + 1
+                elif field_type == ABORTED_FIELD:
+                    self.ended = timestamp
+                    self.status = status_service.CANCELLED
+                    self.runs = self.runs + 1
+                elif field_type == FAILED_FIELD:
+                    self.ended = timestamp
+                    self.status = status_service.FAILED
+                    self.runs = self.runs + 1
+                elif field_type == NODE_FIELD:
+                    if len(item_stack) > 1:
+                        node_stack.append(item_stack)
+                        item_stack = []
+                    item_stack.append((field_type, items[1], items[2:]))
+                else:
+                    item_stack.append((field_type, items[1], items[2:]))
+
+        # Add the last node to the stack
+        if len(item_stack) > 1:
+            node_stack.append(item_stack)
+
+        return (status_messages, self._create_graph(node_stack))
+
+    def current_status(self, with_jobs=False):
+        (status_messages, graph_info) = self.parse()
+
+        if status_messages:
+            (timestamp, node_id, new_state, job_id,
+            nodes_waiting, nodes_running, nodes_complete,
+            nodes_failed, nodes_aborted,
+            node_id_counter) = (int(item) for item in status_messages[-1])
+
+            if (hasattr(self, 'ended') and self.ended >= timestamp
+                and self.runs == 0):
+                status = self.status
+            elif with_jobs:
+                status_service = ServiceManager.get("status", "internal")
+                status = status_service.RUNNING
+            else:
+                status = new_state
+        else:
+            status_service = ServiceManager.get("status", "internal")
+            status = status_service.WAITING
+
+        return status
+
+    def _create_graph(self, nodes):
+        vertices = []
+        edges = []
+
+        for (node, parents, sources, targets, cmd) in reversed(nodes):
+            vertices.append(' '.join(node[2]))
+            edges.append(parents[2])
+
+        return (vertices, edges)
+
+class MakeflowService(WorkflowService):
+    name = "makeflow"
+
+    def get_status(self, workflow):
+        logfile = "%s.makeflowlog" % workflow
+        status_service = ServiceManager.get("status", "internal")
+
+        lines = None
+        if not os.path.exists(logfile):
+            return status_service.SCHEDULED
+
+        makeflow_log = MakeflowLog(logfile)
+
+        status_code = makeflow_log.current_status()
+        retries = makeflow_log.runs
+        message = status_service.status_message(status_code)
+
+        if status_code == status_service.STARTED:
+            pass
+           # fp.write("Workflow status was [%s]\n\n" % status)
+        if status_code == status_service.WAITING:
+            pass
+           # fp.write("Finished workflow %s\n\n" % workflow.name)
+        elif status_code == status_service.RUNNING:
+            pass
+        elif status_code == status_service.COMPLETED:
+            pass
+        elif status_code == status_service.FAILED:
+            pass
+        elif status_code == status_service.ABORTED:
+            pass
+           # fp.write("Workflow %s Aborted\n\n" % workflow.name)
+        else:
+            pass
+
+        logger.info(message)
+        return status_code
+
+    def create_workflow(self, data):
+        workflow = Makeflow.from_blob(data)
+
+        try:
+            workflow.generate()
+        except:
+            logger.exception("%s could not be generated", workflow.name)
+            os.remove(str(workflow))
+
+            workflow = None
+
+        return workflow
 
     # TODO: The makeflow options should be configurable.
     # @by Evan Briones
@@ -266,11 +328,22 @@ class MakeflowService(WorkflowService):
     def run_workflow(self, workflow):
         logger.info("Running workflow: %s", workflow)
 
-        try:
-            os.popen("makeflow -T wq -N coge -a -C localhost:1024 %s &" %
-                    os.path.abspath(workflow))
-        except:
-            logger.exception("Unable to run workflow")
+        status_service = ServiceManager.get("status", "internal")
+        status_code = status_service.SCHEDULED
+        logfile = "%s.makeflowlog" % workflow
 
-def append_newline(string):
-     return string + "\n"
+        if os.path.exists(logfile):
+            makeflow_log = MakeflowLog(logfile)
+            status_code = makeflow_log.current_status()
+
+        if ((not status_code == status_service.COMPLETED and
+            not status_code == status_service.RUNNING) or
+            workflow.restart):
+            try:
+                with open(workflow.logfile, 'a') as fp:
+                    fp.write("Started workflow %s\n" % workflow.name)
+
+                os.popen("makeflow -T wq -N coge -a -C localhost:1024 -z %s &" %
+                        workflow)
+            except:
+                logger.exception("Unable to run workflow")
