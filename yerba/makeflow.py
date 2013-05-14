@@ -265,9 +265,10 @@ class MakeflowLog():
         vertices = []
         edges = []
 
-        for (node, parents, sources, targets, cmd) in reversed(nodes):
-            vertices.append(' '.join(node[2]))
-            edges.append(parents[2])
+        if nodes:
+            for (node, parents, sources, targets, cmd) in reversed(nodes):
+                vertices.append(' '.join(node[2]))
+                edges.append(parents[2])
 
         return (vertices, edges)
 
@@ -317,7 +318,6 @@ class MakeflowService(WorkflowService):
         except:
             logger.exception("%s could not be generated", workflow.name)
             os.remove(str(workflow))
-
             workflow = None
 
         return workflow
@@ -326,8 +326,6 @@ class MakeflowService(WorkflowService):
     # @by Evan Briones
     # @on 3/7/2013
     def run_workflow(self, workflow):
-        logger.info("Running workflow: %s", workflow)
-
         status_service = ServiceManager.get("status", "internal")
         status_code = status_service.SCHEDULED
         logfile = "%s.makeflowlog" % workflow
@@ -343,7 +341,10 @@ class MakeflowService(WorkflowService):
                 with open(workflow.logfile, 'a') as fp:
                     fp.write("Started workflow %s\n" % workflow.name)
 
-                os.popen("makeflow -T wq -N coge -a -C localhost:1024 -z %s &" %
-                        workflow)
+                logger.info("Running workflow: %s", workflow)
+                os.popen("makeflow -T wq -N coge -a -C localhost:1024 -P %d %s &" % (
+                        workflow.priority, workflow))
             except:
                 logger.exception("Unable to run workflow")
+        else:
+            logger.info("Workflow was not scheduled to be run.")
