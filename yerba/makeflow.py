@@ -1,4 +1,5 @@
 import logging
+from subprocess import Popen
 import os
 
 from workflow import Workflow, WorkflowService, Job
@@ -279,8 +280,16 @@ class MakeflowService(WorkflowService):
         logfile = "%s.makeflowlog" % workflow
         status_service = ServiceManager.get("status", "internal")
 
+        if hasattr(workflow, 'process'):
+            running = workflow.process.poll() is None
+        else:
+            running = False
+
         lines = None
-        if not os.path.exists(logfile):
+        if not os.path.exists(logfile) and running:
+            return status_service.SCHEDULED
+        elif not os.path.exists(logfile) and not running:
+            self.run_workflow(randint(0, 32), workflow)
             return status_service.SCHEDULED
 
         makeflow_log = MakeflowLog(logfile)
@@ -297,8 +306,8 @@ class MakeflowService(WorkflowService):
            # fp.write("Finished workflow %s\n\n" % workflow.name)
         elif status_code == status_service.RUNNING:
             pass
-        elif status_code == status_service.COMPLETED:
-            pass
+        elif status_code == status_service.COMPLETED and hasattr(workflow, 'process'):
+            workflow.process = None
         elif status_code == status_service.FAILED:
             pass
         elif status_code == status_service.ABORTED:
@@ -334,17 +343,20 @@ class MakeflowService(WorkflowService):
             makeflow_log = MakeflowLog(logfile)
             status_code = makeflow_log.current_status()
 
-        if ((not status_code == status_service.COMPLETED and
-            not status_code == status_service.RUNNING) or
-            workflow.restart):
-            try:
-                with open(workflow.logfile, 'a') as fp:
-                    fp.write("Started workflow %s\n" % workflow.name)
-
-                logger.info("Running workflow: %s", workflow)
-                os.popen("makeflow -T wq -N coge -a -C localhost:1024 -P %d %s &" % (
-                        workflow.priority, workflow))
-            except:
-                logger.exception("Unable to run workflow")
-        else:
+        if status_code == status_service.COMPLETED:
             logger.info("Workflow was not scheduled to be run.")
+            return
+
+        try:
+            with open(workflow.logfile, 'a') as fp:
+                fp.write("Started workflow %s\n" % workflow.name)
+
+            cmd = ['makeflow', '-T', 'wq', '-N', 'coge', '-a', '-C']
+            cmd.extend(['localhost:1024', '-P', str(workflow.priority)])
+            cmd.extend([str(workflow)])
+            workflow.process = Popen(cmd)
+
+            logger.info("Running makeflow for: %s", workflow)
+#            os.popen("makeflow -T wq -N coge -a -C localhost:1024 -P %s %s &" % (workflow.priority, workflow))
+        except:
+            logger.exception("Unable to run workflow")

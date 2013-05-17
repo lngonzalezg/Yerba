@@ -78,8 +78,22 @@ def schedule_workflow(data):
 def fetch_workflow():
     """ Fetches the job for the given workflow_key"""
     (priority, count, workflow_key) = heapq.heappop(jex_queue)
+    workflow = workflows[workflow_key]
 
-    return workflows[workflow_key]
+    logger.info("Fetching %s workflow.", workflow.name)
+
+    return workflow
+
+def terminate_workflow(workflow_key):
+    """ Terminates the job if it is running."""
+    status_service = ServiceManager.get("status", "internal")
+
+    if workflow_key in workflows:
+        code = status_service.TERMINATE
+    else:
+        code = status_service.NOT_FOUND
+
+    return code
 
 def get_status(workflow_key):
     status_service = ServiceManager.get("status", "internal")
@@ -114,6 +128,8 @@ def dispatch(request, data):
         status_code = get_status(data)
     elif request == "schedule":
         status_code = schedule_workflow(data)
+    elif request == "cancel":
+        status_code = terminate_workflow(data)
 
     return encoder.encode({"status" : status_code})
 
@@ -145,7 +161,6 @@ def listen_forever(port):
         socket.send_unicode(response)
 
         if jex_queue:
-            logger.info("Fetching new workflow to run.")
             workflow_service = ServiceManager.get("makeflow", group="workflow")
             workflow_service.run_workflow(fetch_workflow())
 
