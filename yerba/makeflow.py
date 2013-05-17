@@ -353,7 +353,7 @@ class MakeflowService(WorkflowService):
 
             cmd = ['makeflow', '-T', 'wq', '-N', 'coge', '-a', '-C']
             cmd.extend(['localhost:1024', '-P', str(workflow.priority)])
-            cmd.extend(['-E', '-t', '10', str(workflow)])
+            cmd.extend(['-t', '10', str(workflow)])
             workflow.process = Popen(cmd)
 
             logger.info("Running makeflow for: %s", workflow)
