@@ -289,7 +289,7 @@ class MakeflowService(WorkflowService):
         if not os.path.exists(logfile) and running:
             return status_service.SCHEDULED
         elif not os.path.exists(logfile) and not running:
-            self.run_workflow(randint(0, 32), workflow)
+            self.run_workflow(workflow)
             return status_service.SCHEDULED
 
         makeflow_log = MakeflowLog(logfile)
