@@ -3,6 +3,10 @@ class Service(object):
     def initialize(self):
         pass
 
+class InitializeServiceException(Exception):
+    """Exception raised when a service fails to initialize properly."""
+    pass
+
 class StatusService(Service):
     name = "status"
     group = "internal"

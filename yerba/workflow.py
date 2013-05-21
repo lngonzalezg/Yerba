@@ -54,3 +54,10 @@ class WorkflowService(Service):
     def run_workflow(self, workflow):
         ''' Executes a given workflow.'''
         pass
+
+
+class InvalidWorkflowException(ValueError):
+    pass
+
+class EmptyWorkflowException(ValueError):
+    pass

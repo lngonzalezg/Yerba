@@ -2,6 +2,7 @@ import logging
 from subprocess import Popen
 import os
 
+from service import InitializeServiceException
 from workflow import Workflow, WorkflowService, Job
 from managers import ServiceManager
 
@@ -276,6 +277,14 @@ class MakeflowLog():
 class MakeflowService(WorkflowService):
     name = "makeflow"
 
+    def initialize(self):
+        try:
+            subprocess.call(["makeflow"])
+        except OSError as e:
+            if e.errno == os.errno.ENOENT:
+                msg = "The makeflow command is not installed."
+                raise InitializeServiceException(msg)
+
     def get_status(self, workflow):
         logfile = "%s.makeflowlog" % workflow
         status_service = ServiceManager.get("status", "internal")
@@ -324,7 +333,11 @@ class MakeflowService(WorkflowService):
 
         try:
             workflow.generate()
-        except:
+        except EmptyWorkflowException as e:
+            logger.exception("%s could not be generated", workflow.name)
+            os.remove(str(workflow))
+            workflow = None
+        except InvalidWorkflowException as e:
             logger.exception("%s could not be generated", workflow.name)
             os.remove(str(workflow))
             workflow = None
@@ -351,12 +364,17 @@ class MakeflowService(WorkflowService):
             with open(workflow.logfile, 'a') as fp:
                 fp.write("Started workflow %s\n" % workflow.name)
 
-            cmd = ['makeflow', '-T', 'wq', '-N', 'coge', '-a', '-C']
-            cmd.extend(['localhost:1024', '-P', str(workflow.priority)])
-            cmd.extend(['-t', '10', str(workflow)])
-            workflow.process = Popen(cmd)
+            args = ['-T', 'wq', '-N', 'coge', '-a', '-C']
+            args.extend(['localhost:1024', '-P', str(workflow.priority)])
+            args.extend(['-t', '10', str(workflow)])
+            workflow.process = self.execute(args)
 
             logger.info("Running makeflow for: %s", workflow)
 #            os.popen("makeflow -T wq -N coge -a -C localhost:1024 -P %s %s &" % (workflow.priority, workflow))
         except:
             logger.exception("Unable to run workflow")
+
+    def execute(self, args):
+        """Returns the makeflow process given the following arguments"""
+        args.insert(0, "makeflow")
+        return Popen(args)
