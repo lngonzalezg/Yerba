@@ -352,6 +352,11 @@ class MakeflowService(WorkflowService):
         status_code = status_service.SCHEDULED
         logfile = "%s.makeflowlog" % workflow
 
+        makeflow_file = str(workflow)
+
+        if workflow.restart:
+            subprocess.call(["makeflow", "-c", makeflow_file])
+
         if os.path.exists(logfile):
             makeflow_log = MakeflowLog(logfile)
             status_code = makeflow_log.current_status()
@@ -366,7 +371,7 @@ class MakeflowService(WorkflowService):
 
             args = ['-T', 'wq', '-N', 'coge', '-a', '-C']
             args.extend(['localhost:1024', '-P', str(workflow.priority)])
-            args.extend(['-t', '10', str(workflow)])
+            args.extend(['-t', '10', makeflow_file])
             workflow.process = self.execute(args)
 
             logger.info("Running makeflow for: %s", workflow)
