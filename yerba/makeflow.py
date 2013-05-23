@@ -367,7 +367,7 @@ class MakeflowService(WorkflowService):
             with open(workflow.logfile, 'a') as fp:
                 fp.write("Started workflow %s\n" % workflow.name)
 
-            args = ['-T', 'wq', '-N', 'coge', '-a', '-C', '-W', 'fcfs']
+            args = ['-T', 'wq', '-N', 'coge', '-a', '-W', 'fcfs', '-C']
             args.extend(['localhost:1024', '-P', str(workflow.priority)])
             args.extend(['-t', '10', makeflow_file])
             workflow.process = self.execute(args)
