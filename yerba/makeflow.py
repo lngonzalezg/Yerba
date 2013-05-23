@@ -1,5 +1,5 @@
 import logging
-from subprocess import Popen
+from subprocess import (Popen, call)
 import os
 
 from service import InitializeServiceException
@@ -122,10 +122,9 @@ class Makeflow(Workflow):
                 new_job.add_outputs(job['outputs'])
 
             if 'overwrite' in job and int(job['overwrite']):
+                logging.info("Restarting workflow.")
                 workflow.restart = True
-                for output in job.outputs:
-                    if os.path.isfile(output):
-                        os.remove(output)
+
             workflow.add_job(new_job)
 
         return workflow
@@ -134,9 +133,8 @@ class Makeflow(Workflow):
     def generate(self):
         """ Generates a makeflow file. """
         logfile = "%s.makeflowlog" % str(self)
-        overwrite = False
 
-        if os.path.isfile(str(self)) and not overwrite:
+        if os.path.isfile(str(self)) and not self.restart:
             logger.info("%s has already been generated.", self.name)
             return
 
@@ -355,7 +353,7 @@ class MakeflowService(WorkflowService):
         makeflow_file = str(workflow)
 
         if workflow.restart:
-            subprocess.call(["makeflow", "-c", makeflow_file])
+            call(["makeflow", "-c", makeflow_file])
 
         if os.path.exists(logfile):
             makeflow_log = MakeflowLog(logfile)
