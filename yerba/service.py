@@ -1,6 +1,10 @@
 
 class Service(object):
     def initialize(self):
+        '''Initializes the service'''
+        pass
+    def stop(self):
+        '''Stops the service'''
         pass
 
 class InitializeServiceException(Exception):
