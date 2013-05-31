@@ -1,9 +1,10 @@
-import logging
+from logging import getLogger
+from functools import wraps
 
-from service import (Service, StatusService)
+from service import (Service, Status)
+import workflow
 
-logger = logging.getLogger('yerba.manager')
-
+logger = getLogger('yerba.manager')
 SEPERATOR = '.'
 
 class ServiceManager(object):
@@ -53,18 +54,118 @@ class ServiceManager(object):
     def start(cls):
         """Starts the service manager """
         for service in cls.services.values():
-            if isinstance(service, Service):
-                service.initialize()
+            service.initialize()
 
         cls.RUNNING = True
 
     @classmethod
-    def stop(cls):
-        """Stops the service manager """
-        map(srv.stop() for (srv_group, srv) in services)
-        cls.RUNNING = False
+    def update(cls):
+        '''Run service update callback.'''
+        (srv.update() for (srv_group, srv) in cls.services)
 
     @classmethod
-    def initialize(cls, services=None):
-        """Initializes default services to be used."""
-        ServiceManager.register(StatusService())
+    def stop(cls):
+        '''Stops the service manager and all services'''
+        (srv.stop() for (srv_group, srv) in cls.services)
+        cls.RUNNING = False
+
+def route(request):
+    def callback(f):
+        Router.add(request, f)
+    return callback
+
+REQUEST = 'request'
+DATA = 'data'
+
+class Router(object):
+    routes = {}
+
+    @classmethod
+    def add(cls, route, fnc):
+        '''Adds a new route to the dispatch manager'''
+        if route in cls.routes:
+            logger.warn("The route %s already exists.", route)
+        else:
+            cls.routes[route] = fnc
+
+    @classmethod
+    def remove(cls, route):
+        '''Removes a route to the dispatch manager'''
+        if route in cls.routes:
+            del cls.routes[route]
+        else:
+            raise DispatchRouteNotFoundException("Route not found")
+
+    @classmethod
+    def dispatch(cls, request):
+        '''Dispatches request to perform specified task'''
+        if not request and REQUEST not in request or DATA not in request:
+            raise RequestError("Invalid request")
+
+        route = request[REQUEST]
+        data = request[DATA]
+
+        if route in cls.routes:
+            return cls.routes[route](data)
+        else:
+            raise DispatchRouteNotFoundException("Route %s not found", route)
+
+class WorkflowManager(object):
+    workflows = {}
+
+    @classmethod
+    def submit(cls, json):
+        '''Submits workflows to be scheduled'''
+        (name, priority, log, jobs) = workflow.generate_workflow(json)
+
+        if name in cls.workflows:
+            return Status.Attached
+
+        items = [job for job in jobs if job.ready() and not job.completed()]
+        scheduler = ServiceManager.get("workqueue", "scheduler")
+        scheduler.schedule(items, name)
+
+        cls.workflows[name] = (priority, log, jobs)
+        return Status.Scheduled
+
+    @classmethod
+    def fetch(cls, id):
+        '''Gets the next set of jobs to be run.'''
+        if id not in cls.workflows:
+            return
+
+        (priority, log, jobs) = cls.workflows[id]
+
+        return [job for job in jobs if job.ready() and not job.completed()]
+
+    @classmethod
+    def status(cls, id):
+        '''Gets the status of the current workflow.'''
+        if id not in cls.workflows:
+            return Status.NotFound
+
+        (priority, log, jobs) = cls.workflows[id]
+
+        finished = bool([job for job in jobs if not job.completed()])
+
+        if not finished:
+            return Status.Completed
+        else:
+            return Status.Running
+
+    @classmethod
+    def cancel(cls, id):
+        '''Cancel the workflow from being run.'''
+        try:
+            del cls.workflows[id]
+            status = Status.Terminated
+        except KeyError as e:
+            status = Status.NotFound
+
+        return status
+
+class RequestError(Exception):
+    '''Raised when a request is invalid.'''
+
+class DispatchRouteNotFoundException(Exception):
+    '''Exception raised when a dispatch route is not found.'''
