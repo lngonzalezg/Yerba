@@ -112,9 +112,15 @@ def generate_workflow(pyobject):
         new_job = Job(cmd, script, args)
 
         if 'inputs' in job:
+            if any(fp is None for fp in job['inputs']):
+                raise JobError("Workflow %s contains an error in input", name)
             new_job.add_inputs(job['inputs'])
 
+
         if 'outputs' in job:
+            if any(fp is None for fp in job['outputs']):
+                raise JobError("Workflow %s contains an error in output", name)
+
             new_job.add_outputs(job['outputs'])
 
         if 'overwrite' in job and int(job['overwrite']):
