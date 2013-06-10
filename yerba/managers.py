@@ -1,7 +1,8 @@
 from logging import getLogger
 from functools import wraps
 
-from service import (Service, Status)
+from services import (Service, Status)
+from utils import ignored
 import workflow
 
 logger = getLogger('yerba.manager')
@@ -61,12 +62,15 @@ class ServiceManager(object):
     @classmethod
     def update(cls):
         '''Run service update callback.'''
-        (srv.update() for (srv_group, srv) in cls.services)
+        for service in cls.services.values():
+            service.update()
 
     @classmethod
     def stop(cls):
         '''Stops the service manager and all services'''
-        (srv.stop() for (srv_group, srv) in cls.services)
+        for service in cls.services.values():
+            service.stop()
+
         cls.RUNNING = False
 
 def route(request):
@@ -116,56 +120,68 @@ class WorkflowManager(object):
     @classmethod
     def submit(cls, json):
         '''Submits workflows to be scheduled'''
-        (name, priority, log, jobs) = workflow.generate_workflow(json)
-
+        (name, log, priority, jobs) = workflow.generate_workflow(json)
         if name in cls.workflows:
             return Status.Attached
 
-        items = [job for job in jobs if job.ready() and not job.completed()]
+        items = []
+
+        for job in jobs:
+            if not job.completed():
+                items.append(job)
+            else:
+                workflow.log_skipped_job(log, job)
+
         scheduler = ServiceManager.get("workqueue", "scheduler")
-        scheduler.schedule(items, name)
+        scheduler.schedule(items, name, log)
 
         cls.workflows[name] = (priority, log, jobs)
+
         return Status.Scheduled
 
     @classmethod
     def fetch(cls, id):
         '''Gets the next set of jobs to be run.'''
-        if id not in cls.workflows:
-            return
+        iterable = []
+        with ignored(KeyError):
+            (priority, log, jobs) = cls.workflows[id]
+            iterable = [job for job in jobs if job.ready() and not job.completed()]
 
-        (priority, log, jobs) = cls.workflows[id]
-
-        return [job for job in jobs if job.ready() and not job.completed()]
+        return iterable
 
     @classmethod
     def status(cls, id):
         '''Gets the status of the current workflow.'''
-        if id not in cls.workflows:
-            return Status.NotFound
+        status = Status.NotFound
 
-        (priority, log, jobs) = cls.workflows[id]
+        with ignored(KeyError):
+            (priority, log, jobs) = cls.workflows[id]
+            jobs = [job for job in jobs if not job.completed()]
 
-        finished = bool([job for job in jobs if not job.completed()])
+            if any(job.failed() for job in jobs):
+                status = Status.Failed
+                del cls.workflows[id]
+            elif all(job.completed() for job in jobs):
+                status = Status.Completed
+                del cls.workflows[id]
+            else:
+                status = Status.Running
 
-        if not finished:
-            return Status.Completed
-        else:
-            return Status.Running
+        return status
 
     @classmethod
     def cancel(cls, id):
         '''Cancel the workflow from being run.'''
-        try:
+        status = Status.NotFound
+
+        with ignored(KeyError):
             del cls.workflows[id]
             status = Status.Terminated
-        except KeyError as e:
-            status = Status.NotFound
 
         return status
 
 class RequestError(Exception):
     '''Raised when a request is invalid.'''
 
-class DispatchRouteNotFoundException(Exception):
+class RouteNotFound(RequestError):
     '''Exception raised when a dispatch route is not found.'''

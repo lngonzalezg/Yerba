@@ -7,11 +7,13 @@ import os
 import time
 from string import Template
 
-from zmq import (Context, REP)
+from zmq import (Context, REP, NOBLOCK, ZMQError)
 
-from services import (WorkQueueService, Status)
+from services import Status
 from managers import (ServiceManager, WorkflowManager, Router, route,
-                      RequestError, DispatchRouteNotFoundException)
+                      RequestError, RouteNotFound)
+from workqueue import WorkQueueService
+import utils
 
 DEFAULT_ZMQ_PORT = 5151
 
@@ -40,82 +42,61 @@ else:
 @route("schedule")
 def schedule_workflow(data):
     '''Returns the job id'''
-    status = WorkflowManager.submit(data)
-
-    if status == Status.Attached:
-        logger.info("Attached workflow")
-    else:
-        logger.info("Scheduled workflow")
-
-    return status
+    return WorkflowManager.submit(data)
 
 @route("cancel")
 def terminate_workflow(id):
     '''Terminates the job if it is running.'''
     status = WorkflowManager.cancel(id)
-
-    if status == Status.NotFound:
-        logger.info("Unable to cancel workflow not found.")
-    else:
-        logger.info("Workflow was cancelled")
+    logger.info(_status_messages(id))
 
     return status
+
+_status_messages = {
+    Status.Attached: "The workflow %s is Attached",
+    Status.Scheduled: "The workflow %s has been scheduled.",
+    Status.Completed: "The workflow %s was completed.",
+    Status.Terminated: "The workflow %s has been terminated.",
+    Status.Failed: "The workflow %s failed.",
+    Status.Error: "The workflow %s has errors.",
+    Status.NotFound: "The workflow %s was not found.",
+    Status.Running: "The workflow %s is running."
+}
 
 @route("get_status")
 def get_workflow_status(id):
     '''Gets the status of the workflow.'''
     status = WorkflowManager.status(id)
-
-    if status == Status.Attached:
-        logger.info("The workflow %s is Attached", id)
-    elif status == Status.Scheduled:
-        logger.info("The workflow %s is Scheduled", id)
-    elif status == Status.Completed:
-        logger.info("The workflow %s is Completed", id)
-    elif status == Status.Waiting:
-        logger.info("The workflow %s is Waiting", id)
-    elif status == Status.Terminated:
-        logger.info("The workflow %s was Terminated", id)
-    elif status == Status.Running:
-        logger.info("The workflow %s is Running", id)
-    elif status == Status.Error:
-        logger.info("The workflow %s has errors", id)
-    elif status == Status.NotFound:
-        logger.info("The workflow %s was not found", id)
-    else:
-        logger.info("The workflow %s is in an unknown status %d", id, status)
+    logger.info(_status_messages[status], id)
 
     return status
 
-def listen_forever(connection_string):
-    encoder = JSONEncoder()
-    decoder = JSONDecoder()
-    context = Context()
 
+def listen_forever(connection_string):
+    context = Context()
     socket = context.socket(REP)
     socket.bind(connection_string)
 
     while True:
-        request = socket.recv()
-
-        try:
-            request_object = decoder.decode(request.decode("ascii"))
-        except:
-            request_object = None
-            logger.exception("Request was not able to be decoded.")
-
-        try:
-            status = Router.dispatch(request_object)
-        except RequestError as e:
-            logger.exception("The request was invalid")
-            status = Status.Error
-        except DispatchRouteNotFoundException as e:
-            logger.exception("The request is not supported.")
-            status = Status.Error
-
-        response = encoder.encode({"status" : status})
-        socket.send_unicode(response)
         ServiceManager.update()
+
+        with utils.ignored(ZMQError):
+            msg = socket.recv(flags=NOBLOCK)
+
+            try:
+                request_object = JSONDecoder().decode(msg.decode("ascii"))
+            except:
+                request_object = None
+                logger.exception("Request was not able to be decoded.")
+
+            try:
+                status = Router.dispatch(request_object)
+            except (RequestError, RouteNotFound):
+                logger.exception("The request failed.")
+                status = Status.Error
+
+            response = JSONEncoder().encode({"status" : status})
+            socket.send_unicode(response)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -133,8 +114,6 @@ if __name__ == "__main__":
             raise ValueError('Invalid log level: %s' % log_level)
         logger.setLevel(log_level)
 
-    connection_string = Template("tcp://*:$port").substitute(port=args.port)
-
     ServiceManager.register(WorkQueueService())
     ServiceManager.start()
-    listen_forever(connection_string)
+    listen_forever(Template("tcp://*:$port").substitute(port=args.port))

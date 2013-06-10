@@ -2,8 +2,16 @@ import heapq
 import logging
 import os
 
-from service import Service
+from services import Service
+from utils import ignored
 logger = logging.getLogger('yerba.workflow')
+
+def log_skipped_job(log, job):
+    with open(log, 'a') as fp:
+        fp.write('#' * 25 + '\n')
+        fp.write("Job: %s\n" % job)
+        fp.write("Skipped: The analysis was previously generated.\n")
+        fp.write('#' * 25 + '\n\n')
 
 def _format_args(args):
     argstring = ""
@@ -19,12 +27,13 @@ def _format_args(args):
     return argstring
 
 class Job(object):
-    def __init__(self, cmd, script, arguments):
+    def __init__(self, cmd, script, arguments, retries=3):
         self.cmd = cmd
         self.script = script
         self.args = arguments
         self.inputs = []
         self.outputs = []
+        self.retries = retries
 
     def add_inputs(self, files):
         self._add_files(files)
@@ -38,6 +47,11 @@ class Job(object):
         elif isinstance(files, list):
             self.inputs.extend(files)
 
+    def clear(self):
+        for output in self.outputs:
+            with ignored(OSError):
+                os.remove(output)
+
     def completed(self):
         '''Returns whether or not the job was completed.'''
         missing = [fp for fp in self.outputs if not os.path.isfile(fp)]
@@ -47,6 +61,12 @@ class Job(object):
         '''Returns that the job has its input files and is ready.'''
         missing = [fp for fp in self.inputs if not os.path.isfile(fp)]
         return not bool(missing)
+
+    def restart(self):
+        self.retries = self.retries - 1
+
+    def failed(self):
+        return self.retries <= 0
 
     def __repr__(self):
         return ' '.join([self.cmd, _format_args(self.args)])
@@ -73,21 +93,20 @@ def _parse_cmdstring(cmdstring):
 def generate_workflow(pyobject):
     '''Generates a workflow from a python object.'''
     if 'name' not in pyobject or 'jobs' not in pyobject:
-        raise InvalidWorkflowException("The workflow format was invalid.")
+        raise InvalidWorkflow("The workflow format was invalid.")
 
     if not len(pyobject['jobs']):
-        raise EmptyWorkflowException("The workflow does not contain any jobs.")
+        raise EmptyWorkflow("The workflow does not contain any jobs.")
 
     name = pyobject['name']
     priority = 0
     jobs = []
-    logname = "%s.log" % name
-    logfile = os.path.join(pyobject['filepath'], logname)
+    logfile = pyobject['logfile']
 
     for job in pyobject['jobs']:
         if ('cmdstring' not in job or 'inputs' not in job
             or 'outputs' not in job):
-            raise InvalidJobException("The job format was invalid.")
+            raise JobError("The job format was invalid.")
 
         (cmd, script, args) = _parse_cmdstring(job['cmdstring'])
         new_job = Job(cmd, script, args)
@@ -99,47 +118,18 @@ def generate_workflow(pyobject):
             new_job.add_outputs(job['outputs'])
 
         if 'overwrite' in job and int(job['overwrite']):
-            logging.info("The job will be restarted.")
-            new_job.restart = True
+            logger.info("The job will be restarted.")
+            new_job.clear()
 
         jobs.append(new_job)
 
     return (name, logfile, priority, jobs)
 
-class Workflow(object):
-    def on_schedule(self):
-        '''Called to schedule the workflow.'''
-
-    def on_submit(self):
-        '''Called when the workflow is scheduled.'''
-
-    def on_complete(self):
-        '''Cancels the workflow.'''
-
-    def on_cancel(self):
-        '''Cancels the workflow.'''
-
-    def on_status(self):
-        '''Request the status of the workflow'''
-
-class WorkflowService(Service):
-    def initialize(self):
-        self.queue = {}
-
-    def submit(self, workflow):
-        '''Submits a workflow to the queue.'''
-        if workflow.name in self.queue:
-            return service.COMPLETED
-
-    def update(self):
-        '''Updates the scheduler.'''
-
-
-class InvalidJobException(ValueError):
+class JobError(ValueError):
     pass
 
-class InvalidWorkflowException(ValueError):
+class InvalidWorkflow(JobError):
     pass
 
-class EmptyWorkflowException(ValueError):
+class EmptyWorkflow(JobError):
     pass
