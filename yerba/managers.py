@@ -1,8 +1,8 @@
 from logging import getLogger
 from functools import wraps
 
-from services import (Service, Status)
-from utils import ignored
+import services
+import utils
 import workflow
 
 logger = getLogger('yerba.manager')
@@ -122,7 +122,7 @@ class WorkflowManager(object):
         '''Submits workflows to be scheduled'''
         (name, log, priority, jobs) = workflow.generate_workflow(json)
         if name in cls.workflows:
-            return Status.Attached
+            return services.Status.Attached
 
         items = []
 
@@ -137,13 +137,13 @@ class WorkflowManager(object):
 
         cls.workflows[name] = (priority, log, jobs)
 
-        return Status.Scheduled
+        return services.Status.Scheduled
 
     @classmethod
     def fetch(cls, id):
         '''Gets the next set of jobs to be run.'''
         iterable = []
-        with ignored(KeyError):
+        with utils.ignored(KeyError):
             (priority, log, jobs) = cls.workflows[id]
             iterable = [job for job in jobs if job.ready() and not job.completed()]
 
@@ -152,31 +152,31 @@ class WorkflowManager(object):
     @classmethod
     def status(cls, id):
         '''Gets the status of the current workflow.'''
-        status = Status.NotFound
+        status = services.Status.NotFound
 
-        with ignored(KeyError):
+        with utils.ignored(KeyError):
             (priority, log, jobs) = cls.workflows[id]
             jobs = [job for job in jobs if not job.completed()]
 
             if any(job.failed() for job in jobs):
-                status = Status.Failed
+                status = services.Status.Failed
                 del cls.workflows[id]
             elif all(job.completed() for job in jobs):
-                status = Status.Completed
+                status = services.Status.Completed
                 del cls.workflows[id]
             else:
-                status = Status.Running
+                status = services.Status.Running
 
         return status
 
     @classmethod
     def cancel(cls, id):
         '''Cancel the workflow from being run.'''
-        status = Status.NotFound
+        status = services.Status.NotFound
 
         with ignored(KeyError):
             del cls.workflows[id]
-            status = Status.Terminated
+            status = services.Status.Terminated
 
         return status
 

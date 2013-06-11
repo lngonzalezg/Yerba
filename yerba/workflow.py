@@ -3,7 +3,7 @@ import logging
 import os
 
 from services import Service
-from utils import ignored
+import utils
 logger = logging.getLogger('yerba.workflow')
 
 def log_skipped_job(log, job):
@@ -35,21 +35,9 @@ class Job(object):
         self.outputs = []
         self.retries = retries
 
-    def add_inputs(self, files):
-        self._add_files(files)
-
-    def add_outputs(self, files):
-        self._add_files(files, output_file=True)
-
-    def _add_files(self, files, output_file=False):
-        if isinstance(files, list) and output_file:
-            self.outputs.extend(files)
-        elif isinstance(files, list):
-            self.inputs.extend(files)
-
     def clear(self):
         for output in self.outputs:
-            with ignored(OSError):
+            with utils.ignored(OSError):
                 os.remove(output)
 
     def completed(self):
@@ -93,10 +81,10 @@ def _parse_cmdstring(cmdstring):
 def generate_workflow(pyobject):
     '''Generates a workflow from a python object.'''
     if 'name' not in pyobject or 'jobs' not in pyobject:
-        raise InvalidWorkflow("The workflow format was invalid.")
+        raise WorkflowError("The workflow format was invalid.")
 
     if not len(pyobject['jobs']):
-        raise EmptyWorkflow("The workflow does not contain any jobs.")
+        raise WorkflowError("The workflow does not contain any jobs.")
 
     name = pyobject['name']
     priority = 0
@@ -114,14 +102,14 @@ def generate_workflow(pyobject):
         if 'inputs' in job:
             if any(fp is None for fp in job['inputs']):
                 raise JobError("Workflow %s contains an error in input", name)
-            new_job.add_inputs(job['inputs'])
+            new_job.inputs.extend(job['inputs'])
 
 
         if 'outputs' in job:
             if any(fp is None for fp in job['outputs']):
                 raise JobError("Workflow %s contains an error in output", name)
 
-            new_job.add_outputs(job['outputs'])
+            new_job.outputs.extend(job['outputs'])
 
         if 'overwrite' in job and int(job['overwrite']):
             logger.info("The job will be restarted.")
@@ -134,8 +122,5 @@ def generate_workflow(pyobject):
 class JobError(ValueError):
     pass
 
-class InvalidWorkflow(JobError):
-    pass
-
-class EmptyWorkflow(JobError):
+class WorkflowError(ValueError):
     pass
