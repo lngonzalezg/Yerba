@@ -1,25 +1,44 @@
+from __future__ import division
 import itertools
 import os
-from logging import getLogger
+import datetime
+import logging
 
 from work_queue import (Task, WorkQueue, WORK_QUEUE_DEFAULT_PORT,
                         WORK_QUEUE_INPUT, WORK_QUEUE_OUTPUT, set_debug_flag,
                         WORK_QUEUE_MASTER_MODE_CATALOG)
 import services
-from managers import WorkflowManager
+import managers
 
-logger = getLogger('yerba.workqueue')
+logger = logging.getLogger('yerba.workqueue')
 
+DIV = 1000000.0
+_dateformat="%d/%m/%y at %I:%M:%S%p"
 
 def write_to_log(logfile, task):
     with open(str(logfile), 'a') as fp:
-        fp.write("Job: %s\n" % task.command)
-        fp.write("Submitted at: %d\n" % task.submit_time)
-        fp.write("Execution time of command: %d\n" % task.cmd_execution_time)
-        fp.write("Completed at: %d\n" % task.finish_time)
-        fp.write("Assigned to task: %d\n" % task.id)
-        fp.write("Return status: %d\n" % task.return_status)
-        fp.write("{task}\n".format(task=task.output))
+        dt1 = datetime.datetime.fromtimestamp(task.submit_time / DIV)
+        start_time = dt1.strftime(_dateformat)
+
+        dt2 = datetime.datetime.fromtimestamp(task.finish_time / DIV)
+        finish_time = dt2.strftime(_dateformat)
+        execution_time = task.cmd_execution_time / DIV
+
+        msg = ("Job: {command}\n"
+        "Submitted at: {start_date}\n"
+        "Completed at: {end_date}\n"
+        "Execution time: {delta} sec\n"
+        "Assigned to task: {id}\n"
+        "Return status: {status}\n"
+        "{task}\n")
+
+        fp.write(msg.format(command=task.command,
+            start_date=start_time,
+            end_date=finish_time,
+            delta=execution_time,
+            id=task.id,
+            status = task.return_status,
+            task = task.output))
 
 class WorkQueueService(services.Service):
     name = "workqueue"
@@ -92,7 +111,7 @@ class WorkQueueService(services.Service):
             (name, log, job) = self.tasks[task.id]
             job.task_info = task
             write_to_log(log, task)
-            iterable = WorkflowManager.fetch(name)
+            iterable = managers.WorkflowManager.fetch(name)
 
             if job.completed():
                 del self.tasks[task.id]
