@@ -122,7 +122,7 @@ class WorkflowManager(object):
         '''Submits workflows to be scheduled'''
         try:
             (name, log, priority, jobs) = workflow.generate_workflow(json)
-        except:
+        except Exception:
             logger.exception("The workflow could not be generated.")
             return services.Status.Error
 
