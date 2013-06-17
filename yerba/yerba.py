@@ -14,6 +14,17 @@ import utils
 
 DEFAULT_ZMQ_PORT = 5151
 
+_status_messages = {
+    Status.Attached: "The workflow %s is Attached",
+    Status.Scheduled: "The workflow %s has been scheduled.",
+    Status.Completed: "The workflow %s was completed.",
+    Status.Terminated: "The workflow %s has been terminated.",
+    Status.Failed: "The workflow %s failed.",
+    Status.Error: "The workflow %s has errors.",
+    Status.NotFound: "The workflow %s was not found.",
+    Status.Running: "The workflow %s is running."
+}
+
 # Setup Logging
 if os.path.exists("logging.conf"):
    logging.config.fileConfig("logging.conf")
@@ -48,17 +59,6 @@ def terminate_workflow(id):
     logger.info(_status_messages(id))
 
     return status
-
-_status_messages = {
-    Status.Attached: "The workflow %s is Attached",
-    Status.Scheduled: "The workflow %s has been scheduled.",
-    Status.Completed: "The workflow %s was completed.",
-    Status.Terminated: "The workflow %s has been terminated.",
-    Status.Failed: "The workflow %s failed.",
-    Status.Error: "The workflow %s has errors.",
-    Status.NotFound: "The workflow %s was not found.",
-    Status.Running: "The workflow %s is running."
-}
 
 @route("get_status")
 def get_workflow_status(id):
