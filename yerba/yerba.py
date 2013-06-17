@@ -1,11 +1,8 @@
 import argparse
-from json import (JSONEncoder, JSONDecoder)
-import json as js
 import logging
 import logging.handlers as loghandlers
 import os
 import time
-from string import Template
 
 from zmq import (Context, REP, NOBLOCK, ZMQError)
 
@@ -71,7 +68,6 @@ def get_workflow_status(id):
 
     return status
 
-
 def listen_forever(connection_string):
     context = Context()
     socket = context.socket(REP)
@@ -79,24 +75,19 @@ def listen_forever(connection_string):
 
     while True:
         ServiceManager.update()
+        status = None
 
         with utils.ignored(ZMQError):
-            msg = socket.recv(flags=NOBLOCK)
+            msg = socket.recv_json(flags=NOBLOCK)
 
-            try:
-                request_object = JSONDecoder().decode(msg.decode("ascii"))
-            except:
-                request_object = None
-                logger.exception("Request was not able to be decoded.")
+            with utils.ignored(RequestError, RouteNotFound):
+                status = Router.dispatch(msg)
 
-            try:
-                status = Router.dispatch(request_object)
-            except (RequestError, RouteNotFound):
-                logger.exception("The request failed.")
+            if not status:
                 status = Status.Error
 
-            response = JSONEncoder().encode({"status" : status})
-            socket.send_unicode(response)
+            socket.send_json({"status" : status})
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -108,12 +99,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.log:
-        log_level = getattr(logging, args.log.upper(), None)
-
-        if not isinstance(log_level, int):
-            raise ValueError('Invalid log level: %s' % log_level)
-        logger.setLevel(log_level)
+        logger.setLevel(getattr(logging, args.log.upper(), None))
 
     ServiceManager.register(WorkQueueService())
     ServiceManager.start()
-    listen_forever(Template("tcp://*:$port").substitute(port=args.port))
+    listen_forever("tcp://*:{port}".format(port=args.port))
