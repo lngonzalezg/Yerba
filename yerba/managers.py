@@ -120,7 +120,13 @@ class WorkflowManager(object):
     @classmethod
     def submit(cls, json):
         '''Submits workflows to be scheduled'''
-        (name, log, priority, jobs) = workflow.generate_workflow(json)
+        try:
+            (name, log, priority, jobs) = workflow.generate_workflow(json)
+        except:
+            logger.exception("The workflow could not be generated.")
+            return services.Status.Error
+
+
         if name in cls.workflows:
             return services.Status.Attached
 
