@@ -101,13 +101,13 @@ def generate_workflow(pyobject):
 
         if 'inputs' in job:
             if any(fp is None for fp in job['inputs']):
-                raise JobError("Workflow %s contains an error in input", name)
+                raise JobError("Workflow %s has a NoneType input" % name)
             new_job.inputs.extend(job['inputs'])
 
 
         if 'outputs' in job:
             if any(fp is None for fp in job['outputs']):
-                raise JobError("Workflow %s contains an error in output", name)
+                raise JobError("Workflow %s has a NoneType output" % name)
 
             new_job.outputs.extend(job['outputs'])
 
