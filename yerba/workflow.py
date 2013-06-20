@@ -99,7 +99,12 @@ def generate_workflow(pyobject):
         (cmd, script, args) = _parse_cmdstring(job['cmdstring'])
         new_job = Job(cmd, script, args)
 
-        if 'inputs' in job:
+        if not cmd:
+            raise JobError("The command name is NoneType.")
+        if not args:
+            raise JobError("The arguments are NoneType.")
+
+        if 'inputs' in job and job['inputs']:
             if any(fp is None for fp in job['inputs']):
                 raise JobError("Workflow %s has a NoneType input" % name)
             new_job.inputs.extend(job['inputs'])
