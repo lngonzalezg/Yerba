@@ -72,19 +72,23 @@ class WorkQueueService(services.Service):
         '''
         Schedules jobs into work_queue
         '''
-        for job in iterable:
-            if not job.ready():
+        for new_job in iterable:
+            if not new_job.ready():
                 continue
 
-            cmd = str(job)
+            if any(new_job == job for (name, log, job) in self.tasks.values()):
+                logger.info("The job is already running skipping.")
+                continue
+
+            cmd = str(new_job)
             task = Task(cmd)
 
-            for input_file in job.inputs:
+            for input_file in new_job.inputs:
                 remote_input = os.path.basename(input_file)
                 task.specify_input_file(str(input_file), str(remote_input),
                                        WORK_QUEUE_INPUT)
 
-            for output_file in job.outputs:
+            for output_file in new_job.outputs:
                 remote_output = os.path.basename(output_file)
                 task.specify_file(str(output_file), str(remote_output),
                                   WORK_QUEUE_OUTPUT, cache=False)
@@ -92,7 +96,7 @@ class WorkQueueService(services.Service):
             new_id = self.queue.submit(task)
 
             logger.info("Scheduled job with id: %s", new_id)
-            self.tasks[new_id] = (name, log, job)
+            self.tasks[new_id] = (name, log, new_job)
 
     def update(self):
         '''
