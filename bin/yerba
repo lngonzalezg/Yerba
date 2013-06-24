@@ -58,32 +58,30 @@ start_yerba() {
         sudo -u www-data env PROJECT_NAME=$PROJECT_NAME \
             CATALOG_HOST=$CATALOG_HOST CATALOG_PORT=$CATALOG_PORT \
             PYTHONPATH=$PYTHONPATH python yerba.py &> /dev/null &
-        echo "[Started]"
+        echo "Starting the job execution engine."
     else
-        echo "[Already Running]"
+        echo "Yerba is already running."
     fi
 }
 
 stop() {
     local pids=`pgrep -f "makeflow|catalog_server|work_queue_"`
-    pids="$pids $(pgrep -f 'python yerba.py')"
+    pids="$pids$(pgrep -f 'python yerba.py')"
 
-    if [ "$pids" ]; then
+    if [ "$pids" = "" ]; then
         echo "Yerba is currently not running."
     else
-        echo "[Stopped]"
+        echo "Stopping the job execution engine."
         kill -SIGKILL $pids
     fi
 }
 
 case "$1" in
     start)
-        echo "Starting the job execution engine."
         start
         exit 0
         ;;
     stop)
-        echo "Stopping the job execution engine."
         stop
         exit 0
         ;;
