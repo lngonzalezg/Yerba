@@ -54,7 +54,7 @@ start() {
 }
 
 start_yerba() {
-    if [ "$(pgrep -f yerba.py)" = "" ]; then
+    if [ "$(pgrep -f 'python yerba.py')" = "" ]; then
         sudo -u www-data env PROJECT_NAME=$PROJECT_NAME \
             CATALOG_HOST=$CATALOG_HOST CATALOG_PORT=$CATALOG_PORT \
             PYTHONPATH=$PYTHONPATH python yerba.py &> /dev/null &
@@ -65,8 +65,7 @@ start_yerba() {
 }
 
 stop() {
-    local pids=`pgrep -f "makeflow|catalog_server|work_queue_"`
-    pids="$pids$(pgrep -f 'python yerba.py')"
+    local pids="$(pgrep -f 'python yerba.py|makeflow|catalog_server|work_queue_"')"
 
     if [ "$pids" = "" ]; then
         echo "Yerba is currently not running."
