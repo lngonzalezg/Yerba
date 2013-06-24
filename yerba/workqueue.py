@@ -14,7 +14,7 @@ logger = logging.getLogger('yerba.workqueue')
 
 DIV = 1000000.0
 _dateformat="%d/%m/%y at %I:%M:%S%p"
-PROJECT_NAME = "coge"
+PROJECT_NAME = "yerba"
 
 def write_to_log(logfile, task):
     with open(str(logfile), 'a') as fp:
@@ -58,7 +58,10 @@ class WorkQueueService(services.Service):
         self.counter = itertools.count()
 
         try:
-            self.queue = WorkQueue(name=PROJECT_NAME, catalog=True)
+            name = os.environ.get('PROJECT_NAME')
+            if not name:
+                name = PROJECT_NAME
+            self.queue = WorkQueue(name, catalog=True)
             logger.info("Started work queue master on port %d", self.port)
         except:
             raise InitializeServiceException('Unable to start the work_queue')
