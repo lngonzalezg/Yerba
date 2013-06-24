@@ -61,9 +61,10 @@ class WorkQueueService(services.Service):
             name = os.environ.get('PROJECT_NAME')
             if not name:
                 name = PROJECT_NAME
-            self.queue = WorkQueue(name, catalog=True)
+
+            self.queue = WorkQueue(name=name, catalog=True)
             logger.info("Started work queue master on port %d", self.port)
-        except:
+        except Exception:
             raise InitializeServiceException('Unable to start the work_queue')
 
     def stop(self):
