@@ -114,15 +114,17 @@ class WorkQueueService(services.Service):
             logger.info("Fetching new jobs to be run.")
             (name, log, job) = self.tasks[task.id]
             job.task_info = task
-            write_to_log(log, task)
-            iterable = managers.WorkflowManager.fetch(name)
+            iterable = []
 
             if job.completed():
                 del self.tasks[task.id]
+                write_to_log(log, task)
+                iterable.extend(managers.WorkflowManager.fetch(name))
             elif not job.failed():
                 job.restart()
                 iterable.append(job)
             else:
+                write_to_log(log, task)
                 del self.tasks[task.id]
 
             self.schedule(iterable, name, log)
