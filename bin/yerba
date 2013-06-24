@@ -1,0 +1,97 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides: yerba
+# # Required-Start: $local_fs $syslog $remote_fs dbus
+# # Required-Stop: $local_fs $syslog $remote_fs
+# # Default-Start: 2 3 4 5
+# # Default-Stop: 0 1 6
+# # Short-Description: Start yerba.py
+# ### END INIT INFO
+
+YERBA_ROOT=/opt/Yerba/yerba
+POOL_FILE=$YERBA_ROOT/work_queue_pool.pid
+export PROJECT_NAME=coge
+export CATALOG_HOST=localhost
+export CATALOG_PORT=1024
+export PYTHONPATH="/usr/local/lib/python2.7/site-packages"
+
+if [ "$(id -u)" != "0" ]; then
+    echo "Script must be run as root." 1>&2
+    exit 1
+fi
+
+start_catalog() {
+    if [ "$(pgrep catalog)" ]; then
+        echo "Catalog server is running."
+    else
+        catalog_server -b -p 1024 -l 100 -T 3
+        echo "Catalog server started."
+    fi
+}
+
+start_workers() {
+    local arguments="-C localhost:1024 -a -S /tmp"
+
+    if [ "$(pgrep work_queue_pool)" ]; then
+        echo "Workers already running."
+    else
+        echo "Spawning new workers"
+        if [ -f $POOL_FILE ]; then
+            rm $POOL_FILE
+        fi
+
+        sudo -u www-data work_queue_pool -C localhost:1024 -A -d all &> /dev/null &
+    fi
+}
+
+start() {
+    pushd $YERBA_ROOT
+        start_catalog
+        start_workers
+        start_yerba
+    popd
+}
+
+start_yerba() {
+    if [ "$(pgrep -f yerba.py)" = "" ]; then
+        sudo -u www-data env PROJECT_NAME=$PROJECT_NAME CATALOG_HOST=$CATALOG_HOST CATALOG_PORT=$CATALOG_PORT PYTHONPATH=$PYTHONPATH python yerba.py &
+        echo "[Started]"
+    else
+        echo "[Already Running]"
+    fi
+}
+
+stop() {
+    local pids=`pgrep -f "makeflow|catalog_server|work_queue_"`
+    pids="$pids $(pgrep -f yerba.py)"
+
+    if [ "$pids" == "" ]; then
+        echo "[Already Stopped]"
+    else
+        echo "[Stopped]"
+        kill -SIGKILL $pids
+    fi
+}
+
+case "$1" in
+    start)
+        echo "Starting the job execution engine."
+        start
+        exit 0
+        ;;
+    stop)
+        echo "Stopping the job execution engine."
+        stop
+        exit 0
+        ;;
+    restart|reload|force-reload)
+        echo "Restarting the job execution engine."
+        stop
+        start
+        exit 0
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|reload}" 1>&2
+        exit 1
+        ;;
+esac
