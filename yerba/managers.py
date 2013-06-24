@@ -126,6 +126,12 @@ class WorkflowManager(object):
             logger.exception("The workflow could not be generated.")
             return services.Status.Error
 
+        print
+        for job in jobs:
+            print job
+
+        print
+
 
         if name in cls.workflows:
             return services.Status.Attached

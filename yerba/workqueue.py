@@ -58,7 +58,7 @@ class WorkQueueService(services.Service):
         self.counter = itertools.count()
 
         try:
-            self.queue = WorkQueue(name=PROJECT, catalog=True)
+            self.queue = WorkQueue(name=PROJECT_NAME, catalog=True)
             logger.info("Started work queue master on port %d", self.port)
         except:
             raise InitializeServiceException('Unable to start the work_queue')
