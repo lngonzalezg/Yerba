@@ -40,7 +40,8 @@ start_workers() {
             rm $POOL_FILE
         fi
 
-        sudo -u www-data work_queue_pool -C localhost:1024 -A -d all &> /dev/null &
+        sudo -u www-data work_queue_pool -C localhost:1024 -A -d all \
+            &> /dev/null &
     fi
 }
 
@@ -54,7 +55,9 @@ start() {
 
 start_yerba() {
     if [ "$(pgrep -f yerba.py)" = "" ]; then
-        sudo -u www-data env PROJECT_NAME=$PROJECT_NAME CATALOG_HOST=$CATALOG_HOST CATALOG_PORT=$CATALOG_PORT PYTHONPATH=$PYTHONPATH python yerba.py &
+        sudo -u www-data env PROJECT_NAME=$PROJECT_NAME \
+            CATALOG_HOST=$CATALOG_HOST CATALOG_PORT=$CATALOG_PORT \
+            PYTHONPATH=$PYTHONPATH python yerba.py &> /dev/null &
         echo "[Started]"
     else
         echo "[Already Running]"
@@ -63,10 +66,10 @@ start_yerba() {
 
 stop() {
     local pids=`pgrep -f "makeflow|catalog_server|work_queue_"`
-    pids="$pids $(pgrep -f yerba.py)"
+    pids="$pids $(pgrep -f 'python yerba.py')"
 
-    if [ "$pids" == "" ]; then
-        echo "[Already Stopped]"
+    if [ "$pids" ]; then
+        echo "Yerba is currently not running."
     else
         echo "[Stopped]"
         kill -SIGKILL $pids
