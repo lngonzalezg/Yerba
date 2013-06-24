@@ -181,6 +181,8 @@ class WorkflowManager(object):
         status = services.Status.NotFound
 
         with ignored(KeyError):
+            scheduler = ServiceManager.get("workqueue", "scheduler")
+            scheduler.cancel(cls.workflows[id])
             del cls.workflows[id]
             status = services.Status.Terminated
 

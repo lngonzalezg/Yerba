@@ -25,12 +25,12 @@ def write_to_log(logfile, task):
         execution_time = task.cmd_execution_time / DIV
 
         msg = ("Job: {command}\n"
-        "Submitted at: {start_date}\n"
-        "Completed at: {end_date}\n"
-        "Execution time: {delta} sec\n"
-        "Assigned to task: {id}\n"
-        "Return status: {status}\n"
-        "{task}\n")
+            "Submitted at: {start_date}\n"
+            "Completed at: {end_date}\n"
+            "Execution time: {delta} sec\n"
+            "Assigned to task: {id}\n"
+            "Return status: {status}\n"
+            "{task}\n")
 
         fp.write(msg.format(command=task.command,
             start_date=start_time,
@@ -123,11 +123,11 @@ class WorkQueueService(services.Service):
 
             self.schedule(iterable, name, log)
 
-    def cancel(self, name):
+    def cancel(self, iterable):
         '''
         Removes the jobs based on there job id task id from the queue.
         '''
-        for task in self.workflow[name]:
-            self.queue.cancel_by_taskid(task.id)
-
-        del self.workflow[name]
+        for (task, job) in self.tasks:
+            if any(job == item for item in iterable):
+                self.queue.cancel_by_taskid(task.id)
+                del self.tasks[task.id]
