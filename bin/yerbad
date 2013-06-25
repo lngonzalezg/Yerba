@@ -9,48 +9,57 @@ import sys
 sys.path.insert(0, os.path.abspath('..'))
 from yerba import (yerba, utils)
 
+_path = os.path.dirname(__file__)
 _defaults = {
     'port' : 5151,
-    'level' : 'CRITICAL',
-    'logging' : 'logging.conf',
+    'logging' : os.path.join(_path, 'logging.conf'),
+    'logfile' : os.path.join(_path, 'yerba.log'),
+    'loglevel' : 'WARN',
     'queue-prefix' : 'yerba'
 }
 
-# Setup Logging
-if os.path.exists("logging.conf"):
-   logging.config.fileConfig("logging.conf")
-   logger = logging.getLogger('main')
-else:
-    logger = logging.getLogger('main')
-    logger.setLevel(logging.DEBUG)
+def main(args=None):
+    config = configparser.ConfigParser()
 
-    fmt = logging.Formatter('%(asctime)s %(name)s [%(levelname)s] %(message)s',
-                            datefmt='%m/%d/%Y %I:%M:%S')
+    if args:
+        options = utils.ChainMap(args, _defaults)
+    else:
+        options = utils.ChainMap(_defaults)
 
-    filehandler = loghandlers.TimedRotatingFileHandler('yerba.log', 'midnight')
-    filehandler.setLevel(logging.DEBUG)
-    filehandler.setFormatter(fmt)
+    # Setup Logging
+    if os.path.exists(options['logging']):
+        logging.config.fileConfig("logging.conf")
+        logger = logging.getLogger('yerba')
+    else:
+        logger = logging.getLogger('yerba')
+        logger.setLevel(options['loglevel'])
 
-    streamhandler = logging.StreamHandler()
-    streamhandler.setLevel(logging.INFO)
-    streamhandler.setFormatter(fmt)
+        fmt = logging.Formatter(
+            '%(asctime)s %(name)s [%(levelname)s] %(message)s',
+             datefmt='%m/%d/%Y %I:%M:%S')
 
-    logger.addHandler(filehandler)
-    logger.addHandler(streamhandler)
+        filehandler = loghandlers.TimedRotatingFileHandler(
+                options['logfile'], 'midnight')
+
+        filehandler.setLevel(logging.DEBUG)
+        filehandler.setFormatter(fmt)
+
+        streamhandler = logging.StreamHandler()
+        streamhandler.setLevel(logging.INFO)
+        streamhandler.setFormatter(fmt)
+
+        logger.addHandler(filehandler)
+        logger.addHandler(streamhandler)
+
+    logger.setLevel(getattr(logging, options['loglevel'].upper(), None))
+    yerba.listen_forever(port = options['port'], options = options)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Processes bioinformatic jobs.')
-
     parser.add_argument('--port')
     parser.add_argument('--level')
     parser.add_argument('--logging')
     parser.add_argument('--queue-prefix')
-    namespace = parser.parse_args()
 
-    config = configparser.ConfigParser()
-    arguments = {k:v for k, v in vars(namespace).items() if v}
-    options = utils.ChainMap(arguments, _defaults)
-
-    logger.setLevel(getattr(logging, options['level'].upper(), None))
-    yerba.listen_forever(port = options['port'], options = options)
+    main(args = {k:v for k, v in vars(parser.parse_args()).items() if v})
