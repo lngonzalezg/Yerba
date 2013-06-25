@@ -58,7 +58,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Processes bioinformatic jobs.')
     parser.add_argument('--port')
-    parser.add_argument('--level')
+    parser.add_argument('--loglevel')
     parser.add_argument('--logging')
     parser.add_argument('--queue-prefix')
 
