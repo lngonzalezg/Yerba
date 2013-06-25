@@ -22,13 +22,26 @@ start() {
     fi
 }
 
+status() {
+    if [ "$(pgrep -f 'catalog_server -b')" ]; then
+        echo "The cctools catalog server running"
+    else
+        echo "The cctools catalog server stopped"
+    fi
+}
+
 stop() {
     pkill -SIGKILL -f 'catalog_server -b'
+    echo "The cctools catalog server stopped"
 }
 
 case "$1" in
     start)
         start
+        exit 0
+        ;;
+    status)
+        status
         exit 0
         ;;
     stop)
@@ -38,11 +51,11 @@ case "$1" in
     restart|reload|force-reload)
         stop
         start
-        echo "The cctools catalog server restarted."
+        echo "The cctools catalog server restarted"
         exit 0
         ;;
     *)
-        echo "Usage: $0 {start|stop|reload}" 1>&2
+        echo "Usage: $0 {start|stop|reload|status}" 1>&2
         exit 1
         ;;
 esac

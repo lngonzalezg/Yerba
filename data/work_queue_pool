@@ -25,11 +25,19 @@ start() {
 
         pushd $WORKDIR &> /dev/null
         sudo -u www-data work_queue_pool -C localhost:1024 -A  \
-            -c $CONFIG -d all -S $WORKDIR &> /dev/null &
+            -c $CONFIG -d all &> /dev/null &
         popd &> /dev/null
         echo "The cctools work queue pool started"
     else
         echo "The cctools work queue pool already running"
+    fi
+}
+
+status() {
+    if [ "$(pgrep -f 'work_queue_pool -C')" == "" ]; then
+        echo "The cctools work queue pool stopped"
+    else
+        echo "The cctools work queue pool running"
     fi
 }
 
@@ -43,6 +51,10 @@ case "$1" in
         start
         exit 0
         ;;
+    status)
+        status
+        exit 0
+        ;;
     stop)
         stop
         exit 0
@@ -54,7 +66,7 @@ case "$1" in
         exit 0
         ;;
     *)
-        echo "Usage: $0 {start|stop|reload}" 1>&2
+        echo "Usage: $0 {start|stop|reload|status}" 1>&2
         exit 1
         ;;
 esac

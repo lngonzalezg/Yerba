@@ -37,9 +37,21 @@ stop() {
     pkill -SIGKILL -f 'yerbad'
 }
 
+status() {
+    if [ "$(pgrep -f 'yerbad')" = "" ]; then
+        echo "Yerba stopped"
+    else
+        echo "Yerba running"
+    fi
+}
+
 case "$1" in
     start)
         start
+        exit 0
+        ;;
+    status)
+        status
         exit 0
         ;;
     stop)
@@ -49,11 +61,11 @@ case "$1" in
     restart|reload|force-reload)
         stop
         start
-        echo "Yerba restarted."
+        echo "Yerba restarted"
         exit 0
         ;;
     *)
-        echo "Usage: $0 {start|stop|reload}" 1>&2
+        echo "Usage: $0 {start|stop|reload|status}" 1>&2
         exit 1
         ;;
 esac
