@@ -15,7 +15,7 @@ _defaults = {
     'logging' : os.path.join(_path, 'logging.conf'),
     'logfile' : os.path.join(_path, 'yerba.log'),
     'loglevel' : 'WARN',
-    'queue-prefix' : 'yerba'
+    'queue_prefix' : 'yerba'
 }
 
 def main(args=None):
