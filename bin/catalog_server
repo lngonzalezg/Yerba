@@ -1,0 +1,48 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:catalog_server
+# # Required-Start: $local_fs $syslog $remote_fs dbus
+# # Required-Stop: $local_fs $syslog $remote_fs
+# # Default-Start: 2 3 4 5
+# # Default-Stop: 0 1 6
+# # Short-Description: Start the cctools catalog_server
+# ### END INIT INFO
+
+if [ "$(id -u)" != "0" ]; then
+    echo "Script must be run as root." 1>&2
+    exit 1
+fi
+
+start() {
+    if [ "$(pgrep -f 'catalog_server -b')" ]; then
+        echo "The cctools catalog server already running"
+    else
+        catalog_server -b -p 1024 -l 100 -T 3
+        echo "The cctools catalog server started"
+    fi
+}
+
+stop() {
+    pkill -SIGKILL -f 'catalog_server -b'
+}
+
+case "$1" in
+    start)
+        start
+        exit 0
+        ;;
+    stop)
+        stop
+        exit 0
+        ;;
+    restart|reload|force-reload)
+        stop
+        start
+        echo "The cctools catalog server restarted."
+        exit 0
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|reload}" 1>&2
+        exit 1
+        ;;
+esac

@@ -5,74 +5,36 @@
 # # Required-Stop: $local_fs $syslog $remote_fs
 # # Default-Start: 2 3 4 5
 # # Default-Stop: 0 1 6
-# # Short-Description: Start yerba.py
+# # Short-Description: Start yerbad
 # ### END INIT INFO
 
-YERBA_ROOT=/opt/Yerba/yerba
-POOL_FILE=$YERBA_ROOT/work_queue_pool.pid
-export PROJECT_NAME=coge
-export CATALOG_HOST=localhost
-export CATALOG_PORT=1024
-export PYTHONPATH="/usr/local/lib/python2.7/site-packages"
+YERBA_ROOT=/opt/Yerba
+CMD=$YERBA_ROOT/bin/yerbad
+PROJECT_NAME=coge
+CATALOG_HOST=localhost
+CATALOG_PORT=1024
+PYTHONPATH="/usr/local/lib/python2.7/site-packages:$YERBA_ROOT"
 
 if [ "$(id -u)" != "0" ]; then
     echo "Script must be run as root." 1>&2
     exit 1
 fi
 
-start_catalog() {
-    if [ "$(pgrep catalog)" ]; then
-        echo "Catalog server is running."
-    else
-        catalog_server -b -p 1024 -l 100 -T 3
-        echo "Catalog server started."
-    fi
-}
-
-start_workers() {
-    local arguments="-C localhost:1024 -a -S /tmp"
-
-    if [ "$(pgrep work_queue_pool)" ]; then
-        echo "Workers already running."
-    else
-        echo "Spawning new workers"
-        if [ -f $POOL_FILE ]; then
-            rm $POOL_FILE
-        fi
-
-        sudo -u www-data work_queue_pool -C localhost:1024 -A -d all \
-            &> /dev/null &
-    fi
-}
-
 start() {
-    pushd $YERBA_ROOT
-        start_catalog
-        start_workers
-        start_yerba
-    popd
-}
-
-start_yerba() {
-    if [ "$(pgrep -f 'python yerba.py')" = "" ]; then
+    if [ "$(pgrep -f 'yerbad')" = "" ]; then
         sudo -u www-data env PROJECT_NAME=$PROJECT_NAME \
             CATALOG_HOST=$CATALOG_HOST CATALOG_PORT=$CATALOG_PORT \
-            PYTHONPATH=$PYTHONPATH python yerba.py &> /dev/null &
-        echo "Starting the job execution engine."
+            PYTHONPATH=$PYTHONPATH $CMD --queue-prefix $PROJECT_NAME \
+            &> /dev/null &
+        echo "Yerba started"
     else
-        echo "Yerba is already running."
+        echo "Yerba already running"
     fi
 }
 
 stop() {
-    local pids="$(pgrep -f 'python yerba.py|makeflow|catalog_server|work_queue_"')"
-
-    if [ "$pids" = "" ]; then
-        echo "Yerba is currently not running."
-    else
-        echo "Stopping the job execution engine."
-        kill -SIGKILL $pids
-    fi
+    echo "Yerba stopped"
+    pkill -SIGKILL -f 'yerbad'
 }
 
 case "$1" in
@@ -85,9 +47,9 @@ case "$1" in
         exit 0
         ;;
     restart|reload|force-reload)
-        echo "Restarting the job execution engine."
         stop
         start
+        echo "Yerba restarted."
         exit 0
         ;;
     *)

@@ -1,0 +1,60 @@
+#!/bin/bash
+### BEGIN INIT INFO
+# Provides:catalog_server
+# # Required-Start: $local_fs $syslog $remote_fs dbus
+# # Required-Stop: $local_fs $syslog $remote_fs
+# # Default-Start: 2 3 4 5
+# # Default-Stop: 0 1 6
+# # Short-Description: Start the cctools work_queue_pool
+# ### END INIT INFO
+
+WORKDIR=/opt/Yerba/work_queue_pool
+CONFIG=$WORKDIR/work_queue_pool.conf
+POOL_FILE=$WORKDIR/work_queue_pool.pid
+
+if [ "$(id -u)" != "0" ]; then
+    echo "Script must be run as root." 1>&2
+    exit 1
+fi
+
+start() {
+    if [ "$(pgrep -f 'work_queue_pool -C')" == "" ]; then
+        if [ -f $POOL_FILE ]; then
+            rm $POOL_FILE
+        fi
+
+        pushd $WORKDIR &> /dev/null
+        sudo -u www-data work_queue_pool -C localhost:1024 -A  \
+            -c $CONFIG -d all -S $WORKDIR &> /dev/null &
+        popd &> /dev/null
+        echo "The cctools work queue pool started"
+    else
+        echo "The cctools work queue pool already running"
+    fi
+}
+
+stop() {
+    pkill -SIGKILL -f 'work_queue_pool -C'
+    echo "The cctools work queue pool stopped"
+}
+
+case "$1" in
+    start)
+        start
+        exit 0
+        ;;
+    stop)
+        stop
+        exit 0
+        ;;
+    restart|reload|force-reload)
+        stop
+        start
+        echo "The cctools work queue pool restarted"
+        exit 0
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|reload}" 1>&2
+        exit 1
+        ;;
+esac
