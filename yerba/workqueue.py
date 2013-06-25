@@ -46,6 +46,10 @@ class WorkQueueService(services.Service):
     group = "scheduler"
     port = WORK_QUEUE_DEFAULT_PORT
 
+    @classmethod
+    def set_project(cls, name):
+        cls.project_name = name
+
     def initialize(self):
         '''
         Initializes work_queue for scheduling workers.
@@ -58,11 +62,7 @@ class WorkQueueService(services.Service):
         self.counter = itertools.count()
 
         try:
-            name = os.environ.get('PROJECT_NAME')
-            if not name:
-                name = PROJECT_NAME
-
-            self.queue = WorkQueue(name=name, catalog=True)
+            self.queue = WorkQueue(name=self.project_name, catalog=True)
             logger.info("Started work queue master on port %d", self.port)
         except Exception:
             raise InitializeServiceException('Unable to start the work_queue')

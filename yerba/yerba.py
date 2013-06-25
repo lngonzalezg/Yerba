@@ -24,7 +24,8 @@ _status_messages = {
 }
 
 def listen_forever(port, options=None):
-    ServiceManager.register(WorkQueueService(name = options['queue-prefix']))
+    WorkQueueService.set_project(options['queue-prefix'])
+    ServiceManager.register(WorkQueueService())
     ServiceManager.start()
 
     connection_string = "tcp://*:{}".format(port)
