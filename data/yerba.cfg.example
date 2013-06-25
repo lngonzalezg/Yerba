@@ -1,0 +1,4 @@
+[DEFAULT]
+port = 5151
+logging = '/etc/yerba/logging.conf'
+queue-prefix = coge
