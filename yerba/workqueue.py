@@ -109,12 +109,13 @@ class WorkQueueService(services.Service):
 
         If a task is completed new tasks from the workflow will be scheduled.
         '''
-        if not self.queue.empty():
-            task = self.queue.wait(0)
-        else:
-            task = None
 
-        if task:
+        while not self.queue.empty():
+            task = self.queue.wait(0)
+
+            if not task:
+                break
+
             logger.info("Task returned: %d", task.return_status)
             logger.info("Fetching new jobs to be run.")
             (name, log, job) = self.tasks[task.id]

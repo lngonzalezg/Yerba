@@ -48,6 +48,9 @@ def listen_forever(port, options=None):
 
             socket.send_json({"status" : status})
 
+        if not status:
+            time.sleep(1)
+
 @route("schedule")
 def schedule_workflow(data):
     '''Returns the job id'''
