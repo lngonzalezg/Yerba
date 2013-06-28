@@ -173,11 +173,11 @@ class WorkflowManager(object):
             if any(job.failed() for job in jobs):
                 status = services.Status.Failed
                 del cls.workflows[id]
-            elif all(job.completed() for job in jobs):
+            elif jobs:
+                status = services.Status.Running
+            else:
                 status = services.Status.Completed
                 del cls.workflows[id]
-            else:
-                status = services.Status.Running
 
         return status
 
