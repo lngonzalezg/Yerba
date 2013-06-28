@@ -3,7 +3,7 @@ import logging
 import os
 import time
 
-from zmq import (Context, REP, NOBLOCK, ZMQError)
+import zmq
 from services import Status
 from managers import (ServiceManager, WorkflowManager, Router, route,
                       RequestError, RouteNotFound)
@@ -29,16 +29,18 @@ def listen_forever(port, options=None):
     ServiceManager.start()
 
     connection_string = "tcp://*:{}".format(port)
-    context = Context()
-    socket = context.socket(REP)
+    context = zmq.Context()
+    socket = context.socket(zmq.REP)
     socket.bind(connection_string)
+    poller = zmq.Poller()
+    poller.register(socket, zmq.POLLIN)
 
     while True:
         ServiceManager.update()
         status = None
 
-        with utils.ignored(ZMQError):
-            msg = socket.recv_json(flags=NOBLOCK)
+        if socket in dict(poller.poll(timeout=10)):
+            msg = socket.recv_json(flags=zmq.NOBLOCK)
 
             with utils.ignored(RequestError, RouteNotFound):
                 status = Router.dispatch(msg)
@@ -48,8 +50,6 @@ def listen_forever(port, options=None):
 
             socket.send_json({"status" : status})
 
-        if not status:
-            time.sleep(1)
 
 @route("schedule")
 def schedule_workflow(data):
