@@ -5,8 +5,8 @@ import time
 
 import zmq
 from services import Status
-from managers import (ServiceManager, WorkflowManager, Router, route,
-                      RequestError, RouteNotFound)
+from managers import (ServiceManager, WorkflowManager)
+from routes import (route, dispatch, RouteNotFound)
 from workqueue import WorkQueueService
 import utils
 
@@ -37,13 +37,13 @@ def listen_forever(port, options=None):
 
     while True:
         ServiceManager.update()
-        status = None
 
         if socket in dict(poller.poll(timeout=10)):
             msg = socket.recv_json(flags=zmq.NOBLOCK)
+            status = None
 
-            with utils.ignored(RequestError, RouteNotFound):
-                status = Router.dispatch(msg)
+            with utils.ignored(RouteNotFound):
+                status = dispatch(msg)
 
             if not status:
                 status = Status.Error

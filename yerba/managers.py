@@ -8,6 +8,7 @@ import workflow
 logger = getLogger('yerba.manager')
 SEPERATOR = '.'
 
+
 class ServiceManager(object):
     services = {}
     RUNNING = False
@@ -73,46 +74,8 @@ class ServiceManager(object):
 
         cls.RUNNING = False
 
-def route(request):
-    def callback(f):
-        Router.add(request, f)
-    return callback
 
-REQUEST = 'request'
-DATA = 'data'
 
-class Router(object):
-    routes = {}
-
-    @classmethod
-    def add(cls, route, fnc):
-        '''Adds a new route to the dispatch manager'''
-        if route in cls.routes:
-            logger.warn("The route %s already exists.", route)
-        else:
-            cls.routes[route] = fnc
-
-    @classmethod
-    def remove(cls, route):
-        '''Removes a route to the dispatch manager'''
-        if route in cls.routes:
-            del cls.routes[route]
-        else:
-            raise DispatchRouteNotFoundException("Route not found")
-
-    @classmethod
-    def dispatch(cls, request):
-        '''Dispatches request to perform specified task'''
-        if not request and REQUEST not in request or DATA not in request:
-            raise RequestError("Invalid request")
-
-        route = request[REQUEST]
-        data = request[DATA]
-
-        if route in cls.routes:
-            return cls.routes[route](data)
-        else:
-            raise DispatchRouteNotFoundException("Route %s not found", route)
 
 class WorkflowManager(object):
     workflows = {}
@@ -125,13 +88,6 @@ class WorkflowManager(object):
         except Exception:
             logger.exception("The workflow could not be generated.")
             return services.Status.Error
-
-        print
-        for job in jobs:
-            print job
-
-        print
-
 
         if name in cls.workflows:
             return services.Status.Attached
@@ -194,8 +150,3 @@ class WorkflowManager(object):
 
         return status
 
-class RequestError(Exception):
-    '''Raised when a request is invalid.'''
-
-class RouteNotFound(RequestError):
-    '''Exception raised when a dispatch route is not found.'''
