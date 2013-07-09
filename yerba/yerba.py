@@ -4,24 +4,14 @@ import os
 import time
 
 import zmq
-from services import Status
 from managers import (ServiceManager, WorkflowManager)
 from routes import (route, dispatch, RouteNotFound)
 from workqueue import WorkQueueService
+
 import utils
+import core
 
 logger = logging.getLogger('yerba')
-
-_status_messages = {
-    Status.Attached: "The workflow %s is Attached",
-    Status.Scheduled: "The workflow %s has been scheduled.",
-    Status.Completed: "The workflow %s was completed.",
-    Status.Terminated: "The workflow %s has been terminated.",
-    Status.Failed: "The workflow %s failed.",
-    Status.Error: "The workflow %s has errors.",
-    Status.NotFound: "The workflow %s was not found.",
-    Status.Running: "The workflow %s is running."
-}
 
 def listen_forever(port, options=None):
     WorkQueueService.set_project(options['queue_prefix'])
@@ -46,7 +36,7 @@ def listen_forever(port, options=None):
                 status = dispatch(msg)
 
             if not status:
-                status = Status.Error
+                status = core.Status.Error
 
             socket.send_json({"status" : status})
 
@@ -60,7 +50,7 @@ def schedule_workflow(data):
 def terminate_workflow(id):
     '''Terminates the job if it is running.'''
     status = WorkflowManager.cancel(id)
-    logger.info(_status_messages(id))
+    logger.info(status_messages(id, status))
 
     return status
 
@@ -68,6 +58,6 @@ def terminate_workflow(id):
 def get_workflow_status(id):
     '''Gets the status of the workflow.'''
     status = WorkflowManager.status(id)
-    logger.info(_status_messages[status], id)
+    logger.info(status_messages(id, status))
 
     return status

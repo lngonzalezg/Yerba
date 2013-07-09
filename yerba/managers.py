@@ -1,16 +1,15 @@
 from logging import getLogger
 from functools import wraps
 
-import services
+import core
 import utils
 import workflow
 
 logger = getLogger('yerba.manager')
 SEPERATOR = '.'
 
-
 class ServiceManager(object):
-    services = {}
+    core = {}
     RUNNING = False
 
     @classmethod
@@ -30,32 +29,32 @@ class ServiceManager(object):
 
         key = SEPERATOR.join((service.group, service.name))
 
-        if key in cls.services:
+        if key in cls.core:
             logging.warn("This service already exists.")
         else:
-            cls.services[key] = service
+            cls.core[key] = service
 
     @classmethod
     def deregister(cls, service):
         """Deregisters a service with the manager."""
         key = SEPERATOR.join((service.group, service.name))
 
-        if key in cls.services:
-            del services[key]
+        if key in cls.core:
+            del core[key]
 
     @classmethod
     def get(cls, name, group):
         key = SEPERATOR.join((group, name))
 
-        if key in cls.services:
-            return cls.services[key]
+        if key in cls.core:
+            return cls.core[key]
         else:
             return None
 
     @classmethod
     def start(cls):
         """Starts the service manager """
-        for service in cls.services.values():
+        for service in cls.core.values():
             service.initialize()
 
         cls.RUNNING = True
@@ -63,19 +62,16 @@ class ServiceManager(object):
     @classmethod
     def update(cls):
         '''Run service update callback.'''
-        for service in cls.services.values():
+        for service in cls.core.values():
             service.update()
 
     @classmethod
     def stop(cls):
-        '''Stops the service manager and all services'''
-        for service in cls.services.values():
+        '''Stops the service manager and all core'''
+        for service in cls.core.values():
             service.stop()
 
         cls.RUNNING = False
-
-
-
 
 class WorkflowManager(object):
     workflows = {}
@@ -87,10 +83,10 @@ class WorkflowManager(object):
             (name, log, priority, jobs) = workflow.generate_workflow(json)
         except Exception:
             logger.exception("The workflow could not be generated.")
-            return services.Status.Error
+            return core.Status.Error
 
         if name in cls.workflows:
-            return services.Status.Attached
+            return core.Status.Attached
 
         items = []
 
@@ -105,7 +101,7 @@ class WorkflowManager(object):
 
         cls.workflows[name] = (priority, log, jobs)
 
-        return services.Status.Scheduled
+        return core.Status.Scheduled
 
     @classmethod
     def fetch(cls, id):
@@ -120,19 +116,19 @@ class WorkflowManager(object):
     @classmethod
     def status(cls, id):
         '''Gets the status of the current workflow.'''
-        status = services.Status.NotFound
+        status = core.Status.NotFound
 
         with utils.ignored(KeyError):
             (priority, log, jobs) = cls.workflows[id]
             jobs = [job for job in jobs if not job.completed()]
 
             if any(job.failed() for job in jobs):
-                status = services.Status.Failed
+                status = core.Status.Failed
                 del cls.workflows[id]
             elif jobs:
-                status = services.Status.Running
+                status = core.Status.Running
             else:
-                status = services.Status.Completed
+                status = core.Status.Completed
                 del cls.workflows[id]
 
         return status
@@ -140,13 +136,12 @@ class WorkflowManager(object):
     @classmethod
     def cancel(cls, id):
         '''Cancel the workflow from being run.'''
-        status = services.Status.NotFound
+        status = core.Status.NotFound
 
         with ignored(KeyError):
             scheduler = ServiceManager.get("workqueue", "scheduler")
             scheduler.cancel(cls.workflows[id])
             del cls.workflows[id]
-            status = services.Status.Terminated
+            status = core.Status.Terminated
 
         return status
-
