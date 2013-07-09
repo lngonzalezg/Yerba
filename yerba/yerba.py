@@ -50,7 +50,7 @@ def schedule_workflow(data):
 def terminate_workflow(id):
     '''Terminates the job if it is running.'''
     status = WorkflowManager.cancel(id)
-    logger.info(status_messages(id, status))
+    logger.info(core.status_message(id, status))
 
     return status
 
@@ -58,6 +58,6 @@ def terminate_workflow(id):
 def get_workflow_status(id):
     '''Gets the status of the workflow.'''
     status = WorkflowManager.status(id)
-    logger.info(status_messages(id, status))
+    logger.info(core.status_message(id, status))
 
     return status
