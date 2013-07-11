@@ -81,8 +81,20 @@ class WorkQueueService(services.Service):
             if not new_job.ready():
                 continue
 
-            if any(new_job == job for (name, log, job) in self.tasks.values()):
-                logger.info("The job is already running skipping.")
+            skip = False
+
+            for (taskid, item) in self.tasks.iteritems():
+                (names, log, job) = item
+                if new_job == job:
+                    if name not in names:
+                        names.append(name)
+
+                    self.tasks[taskid] = (names, log, job)
+                    logger.info("The job is already running skipping.")
+                    skip = True
+                    break
+
+            if skip:
                 continue
 
             cmd = str(new_job)
@@ -101,7 +113,7 @@ class WorkQueueService(services.Service):
             new_id = self.queue.submit(task)
 
             logger.info("Scheduled job with id: %s", new_id)
-            self.tasks[new_id] = (name, log, new_job)
+            self.tasks[new_id] = ([name], log, new_job)
 
     def update(self):
         '''
@@ -118,28 +130,43 @@ class WorkQueueService(services.Service):
 
             logger.info("Task returned: %d", task.return_status)
             logger.info("Fetching new jobs to be run.")
-            (name, log, job) = self.tasks[task.id]
+            (names, log, job) = self.tasks[task.id]
             job.task_info = task
-            iterable = []
+            items = {}
 
             if job.completed():
+                for name in names:
+                    iterable = managers.WorkflowManager.fetch(name)
+                    if iterable:
+                        items[name] = iterable
+
                 del self.tasks[task.id]
                 write_to_log(log, task)
-                iterable.extend(managers.WorkflowManager.fetch(name))
             elif not job.failed():
                 job.restart()
-                iterable.append(job)
+                for name in names:
+                    items[name] = [job]
+                del self.tasks[task.id]
             else:
                 write_to_log(log, task)
                 del self.tasks[task.id]
 
-            self.schedule(iterable, name, log)
+            for (name, iterable) in items.iteritems():
+                self.schedule(iterable, name, log)
 
-    def cancel(self, iterable):
+    def cancel(self, name):
         '''
         Removes the jobs based on there job id task id from the queue.
         '''
-        for (task, job) in self.tasks:
-            if any(job == item for item in iterable):
-                self.queue.cancel_by_taskid(task.id)
-                del self.tasks[task.id]
+        for (taskid, item) in self.tasks.iteritems():
+            (names, log, job) = item
+
+            if name in names:
+                names.remove(name)
+
+            if names:
+                del self.tasks[taskid]
+                self.queue.cancel_by_taskid(taskid)
+            else:
+                self.tasks = (names, log, job)
+
