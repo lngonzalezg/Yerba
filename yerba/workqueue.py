@@ -59,7 +59,6 @@ class WorkQueueService(services.Service):
         InitializeServiceException will be raised.
         '''
         self.tasks = {}
-        self.counter = itertools.count()
 
         try:
             self.queue = WorkQueue(name=self.project_name, catalog=True)
@@ -83,7 +82,7 @@ class WorkQueueService(services.Service):
 
             skip = False
 
-            for (taskid, item) in self.tasks.iteritems():
+            for (taskid, item) in self.tasks.items():
                 (names, log, job) = item
                 if new_job == job:
                     if name not in names:
@@ -151,14 +150,14 @@ class WorkQueueService(services.Service):
                 write_to_log(log, task)
                 del self.tasks[task.id]
 
-            for (name, iterable) in items.iteritems():
+            for (name, iterable) in items.items():
                 self.schedule(iterable, name, log)
 
     def cancel(self, name):
         '''
         Removes the jobs based on there job id task id from the queue.
         '''
-        for (taskid, item) in self.tasks.iteritems():
+        for (taskid, item) in self.tasks.items():
             (names, log, job) = item
 
             if name in names:
