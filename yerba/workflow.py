@@ -112,14 +112,17 @@ def generate_workflow(pyobject):
         if 'inputs' in job and job['inputs']:
             if any(fp is None for fp in job['inputs']):
                 raise JobError("Workflow %s has a NoneType input" % name)
-            new_job.inputs.extend(sorted(job['inputs']))
+
+            inputs = [str(item) for item in job['inputs']]
+            new_job.inputs.extend(sorted(inputs))
 
 
         if 'outputs' in job:
             if any(fp is None for fp in job['outputs']):
                 raise JobError("Workflow %s has a NoneType output" % name)
 
-            new_job.outputs.extend(sorted(job['outputs']))
+            outputs = [str(item) for item in job['outputs']]
+            new_job.outputs.extend(sorted(outputs))
 
         if 'overwrite' in job and int(job['overwrite']):
             logger.info("The job will be restarted.")
