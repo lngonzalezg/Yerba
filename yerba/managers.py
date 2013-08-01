@@ -91,15 +91,17 @@ class WorkflowManager(object):
         items = []
 
         for job in jobs:
-            if not job.completed():
+            if job.completed():
+                job.status = 'skipped'
+            elif job.ready():
+                job.status = 'running'
                 items.append(job)
             else:
-                workflow.log_skipped_job(log, job)
-
-        scheduler = ServiceManager.get("workqueue", "scheduler")
-        scheduler.schedule(items, name, log)
+                job.status = 'scheduled'
 
         cls.workflows[name] = (priority, log, jobs)
+        scheduler = ServiceManager.get("workqueue", "scheduler")
+        scheduler.schedule(items, name, log)
 
         return core.Status.Scheduled
 
@@ -107,9 +109,16 @@ class WorkflowManager(object):
     def fetch(cls, id):
         '''Gets the next set of jobs to be run.'''
         iterable = []
+
         with utils.ignored(KeyError):
             (priority, log, jobs) = cls.workflows[id]
-            iterable = [job for job in jobs if job.ready() and not job.completed()]
+
+            for job in jobs:
+                if job.ready() and not job.completed():
+                    job.status = 'running'
+                    iterable.append(job)
+
+            cls.workflows[id] = (priority, log, jobs)
 
         return iterable
 
@@ -117,21 +126,33 @@ class WorkflowManager(object):
     def status(cls, id):
         '''Gets the status of the current workflow.'''
         status = core.Status.NotFound
+        data = []
 
         with utils.ignored(KeyError):
             (priority, log, jobs) = cls.workflows[id]
+
+            for job in jobs:
+                if job.status == 'running' and job.completed():
+                    job.status = 'completed'
+                elif job.failed():
+                    job.status = 'failed'
+
+                data.append({
+                    'status' : job.status,
+                    'description' : job.description,
+                })
+
             jobs = [job for job in jobs if not job.completed()]
 
-            if any(job.failed() for job in jobs):
+            if (any(job.failed() for job in jobs) or
+               any(job.status == 'failed' for job in jobs)):
                 status = core.Status.Failed
-                del cls.workflows[id]
             elif jobs:
                 status = core.Status.Running
             else:
                 status = core.Status.Completed
-                del cls.workflows[id]
 
-        return status
+        return (status, data)
 
     @classmethod
     def cancel(cls, id):

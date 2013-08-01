@@ -3,18 +3,23 @@ from collections import namedtuple
 
 logger = getLogger('yerba.services')
 
-_status_types = ("NotFound"
-    " Waiting"
-    " Running"
-    " Completed"
-    " Failed"
-    " Terminated"
-    " Started"
-    " Scheduled"
-    " Attached"
-    " Error")
+_status_types = [
+    "NotFound",
+    "Waiting",
+    "Running",
+    "Completed",
+    "Failed",
+    "Terminated",
+    "Started",
+    "Scheduled",
+    "Attached",
+    "Error"
+]
 
-Status = namedtuple('Status', _status_types)._make(range(-1, 9))
+def status_name(code):
+    return _status_types[code]
+
+Status = namedtuple('Status', ' '.join(_status_types))._make(range(0, 10))
 
 _status_messages = {
     Status.Attached: "The workflow {0} is Attached",

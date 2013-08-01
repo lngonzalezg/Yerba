@@ -30,21 +30,22 @@ def listen_forever(port, options=None):
 
         if socket in dict(poller.poll(timeout=10)):
             msg = socket.recv_json(flags=zmq.NOBLOCK)
-            status = None
+            response = None
 
             with utils.ignored(RouteNotFound):
-                status = dispatch(msg)
+                response = dispatch(msg)
 
-            if not status:
-                status = core.Status.Error
+            if not response:
+                response = {"status" : 'error'}
 
-            socket.send_json({"status" : status})
+            socket.send_json(response)
 
 
 @route("schedule")
 def schedule_workflow(data):
     '''Returns the job id'''
-    return WorkflowManager.submit(data)
+    status = WorkflowManager.submit(data)
+    return {"status" : core.status_name(status)}
 
 @route("cancel")
 def terminate_workflow(id):
@@ -52,12 +53,12 @@ def terminate_workflow(id):
     status = WorkflowManager.cancel(id)
     logger.info(core.status_message(id, status))
 
-    return status
+    return {"status" : core.status_name(status)}
 
 @route("get_status")
 def get_workflow_status(id):
     '''Gets the status of the workflow.'''
-    status = WorkflowManager.status(id)
+    (status, data) = WorkflowManager.status(id)
     logger.info(core.status_message(id, status))
 
-    return status
+    return {"status" : core.status_name(status), "jobs" : data}

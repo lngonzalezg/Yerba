@@ -27,13 +27,27 @@ def _format_args(args):
     return argstring
 
 class Job(object):
-    def __init__(self, cmd, script, arguments, retries=3):
+    def __init__(self, cmd, script, arguments, retries=3, description=''):
         self.cmd = cmd
         self.script = script
         self.args = arguments
         self.inputs = []
         self.outputs = []
         self.retries = retries
+        self._status = 'waiting'
+        self._description = description
+
+    @property
+    def status(self):
+        return self._status
+
+    @status.setter
+    def status(self, value):
+        self._status = value
+
+    @property
+    def description(self):
+        return self._description
 
     def clear(self):
         for output in self.outputs:
@@ -67,22 +81,6 @@ class Job(object):
     def __str__(self):
         return repr(self)
 
-def _parse_cmdstring(cmdstring):
-    cmd = None
-    script = None
-    args = None
-
-    if 'cmd' in cmdstring:
-        cmd = cmdstring['cmd']
-
-    if 'script' in cmdstring:
-        script = cmdstring['script']
-
-    if 'args' in cmdstring:
-        args = cmdstring['args']
-
-    return (cmd, script, args)
-
 def generate_workflow(pyobject):
     '''Generates a workflow from a python object.'''
     if 'name' not in pyobject or 'jobs' not in pyobject:
@@ -97,12 +95,12 @@ def generate_workflow(pyobject):
     logfile = pyobject['logfile']
 
     for job in pyobject['jobs']:
-        if ('cmdstring' not in job or 'inputs' not in job
-            or 'outputs' not in job):
-            raise JobError("The job format was invalid.")
+        (cmd, script, args) = (job['cmd'], job['script'], job['args'])
 
-        (cmd, script, args) = _parse_cmdstring(job['cmdstring'])
-        new_job = Job(cmd, script, args)
+        if 'description' in job:
+            new_job = Job(cmd, script, args, description=job['description'])
+        else:
+            new_job = Job(cmd, script, args)
 
         if not cmd:
             raise JobError("The command name is NoneType.")
