@@ -142,6 +142,7 @@ class WorkflowManager(object):
                     'description' : job.description,
                 })
 
+            cls.workflows[id] = (priority, log, jobs)
             jobs = [job for job in jobs if not job.completed()]
 
             if (any(job.failed() for job in jobs) or
