@@ -162,7 +162,7 @@ class WorkflowManager(object):
 
         with utils.ignored(KeyError):
             scheduler = ServiceManager.get("workqueue", "scheduler")
-            scheduler.cancel(cls.workflows[id])
+            scheduler.cancel(id)
             del cls.workflows[id]
             status = core.Status.Terminated
 
