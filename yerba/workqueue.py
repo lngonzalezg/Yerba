@@ -169,5 +169,5 @@ class WorkQueueService(services.Service):
                 del self.tasks[taskid]
                 self.queue.cancel_by_taskid(taskid)
             else:
-                self.tasks = (names, log, job)
+                self.tasks[taskid] = (names, log, job)
 
