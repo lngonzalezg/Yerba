@@ -160,7 +160,7 @@ class WorkflowManager(object):
         '''Cancel the workflow from being run.'''
         status = core.Status.NotFound
 
-        with ignored(KeyError):
+        with utils.ignored(KeyError):
             scheduler = ServiceManager.get("workqueue", "scheduler")
             scheduler.cancel(cls.workflows[id])
             del cls.workflows[id]
