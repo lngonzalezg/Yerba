@@ -80,12 +80,12 @@ class WorkflowManager(object):
     def submit(cls, json):
         '''Submits workflows to be scheduled'''
         try:
-            (name, log, priority, jobs) = workflow.generate_workflow(json)
+            (id, name, log, priority, jobs) = workflow.generate_workflow(json)
         except Exception:
             logger.exception("The workflow could not be generated.")
             return core.Status.Error
 
-        if name in cls.workflows:
+        if id in cls.workflows:
             return core.Status.Attached
 
         items = []
@@ -99,9 +99,9 @@ class WorkflowManager(object):
             else:
                 job.status = 'scheduled'
 
-        cls.workflows[name] = (priority, log, jobs)
+        cls.workflows[id] = (priority, log, jobs)
         scheduler = ServiceManager.get("workqueue", "scheduler")
-        scheduler.schedule(items, name, log)
+        scheduler.schedule(items, id, log)
 
         return core.Status.Scheduled
 

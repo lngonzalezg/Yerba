@@ -89,6 +89,7 @@ def generate_workflow(pyobject):
     if not len(pyobject['jobs']):
         raise WorkflowError("The workflow does not contain any jobs.")
 
+    identity = pyobject['id']
     name = pyobject['name']
     priority = 0
     jobs = []
@@ -128,7 +129,7 @@ def generate_workflow(pyobject):
 
         jobs.append(new_job)
 
-    return (name, logfile, priority, jobs)
+    return (identity, name, logfile, priority, jobs)
 
 class JobError(ValueError):
     pass

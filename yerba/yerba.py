@@ -48,17 +48,20 @@ def schedule_workflow(data):
     return {"status" : core.status_name(status)}
 
 @route("cancel")
-def terminate_workflow(id):
+def terminate_workflow(data):
     '''Terminates the job if it is running.'''
-    status = WorkflowManager.cancel(id)
-    logger.info(core.status_message(id, status))
+    identity = data['id']
+    status = WorkflowManager.cancel(identity)
+    logger.info(core.status_message(identity, status))
 
     return {"status" : core.status_name(status)}
 
 @route("get_status")
-def get_workflow_status(id):
+def get_workflow_status(data):
     '''Gets the status of the workflow.'''
-    (status, data) = WorkflowManager.status(id)
-    logger.info(core.status_message(id, status))
+    identity = data['id']
 
-    return {"status" : core.status_name(status), "jobs" : data}
+    (status, jobs) = WorkflowManager.status(identity)
+    logger.info(core.status_message(identity, status))
+
+    return {"status" : core.status_name(status), "jobs" : jobs}
