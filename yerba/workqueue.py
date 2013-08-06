@@ -162,8 +162,10 @@ class WorkQueueService(services.Service):
 
             if name in names:
                 names.remove(name)
+            else:
+                continue
 
-            if names:
+            if not names:
                 del self.tasks[taskid]
                 self.queue.cancel_by_taskid(taskid)
             else:
