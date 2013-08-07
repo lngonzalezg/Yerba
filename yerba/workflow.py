@@ -115,7 +115,7 @@ class WorkflowHelper(object):
         if (any(job.failed() for job in self._workflow.jobs) or
             any(job.status == 'failed' for job in self._workflow.jobs)):
             status = core.Status.Failed
-        if any(job.status == 'cancelled' for job in self._workflow.jobs):
+        elif any(job.status == 'cancelled' for job in self._workflow.jobs):
             status = core.Status.Terminated
         elif self.waiting():
             status = core.Status.Running
