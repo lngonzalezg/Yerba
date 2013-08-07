@@ -137,7 +137,7 @@ class WorkflowManager(object):
             workflow_helper = WorkflowHelper(cls.workflows[id])
 
             for job in workflow_helper.workflow.jobs:
-                if job.status == 'runnworkflow_helper.ing' and job.completed():
+                if job.status == 'running' and job.completed():
                     job.status = 'completed'
                 elif job.failed():
                     job.status = 'failed'
