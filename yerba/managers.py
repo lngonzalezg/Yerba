@@ -3,7 +3,7 @@ from functools import wraps
 
 import core
 import utils
-import workflow
+from workflow import generate_workflow, WorkflowHelper
 
 logger = getLogger('yerba.manager')
 SEPERATOR = '.'
@@ -80,17 +80,22 @@ class WorkflowManager(object):
     def submit(cls, json):
         '''Submits workflows to be scheduled'''
         try:
-            (id, name, log, priority, jobs) = workflow.generate_workflow(json)
+            (id, workflow) = generate_workflow(json)
         except Exception:
             logger.exception("The workflow could not be generated.")
             return core.Status.Error
 
-        if id in cls.workflows:
-            return core.Status.Attached
+        try:
+            workflow_helper = WorkflowHelper(cls.workflows[id])
+            if workflow_helper.status() != core.Status.Terminated:
+                return core.Status.Scheduled
+        except KeyError:
+            pass
 
+        cls.workflows[id] = workflow
         items = []
 
-        for job in jobs:
+        for job in workflow.jobs:
             if job.completed():
                 job.status = 'skipped'
             elif job.ready():
@@ -99,9 +104,8 @@ class WorkflowManager(object):
             else:
                 job.status = 'scheduled'
 
-        cls.workflows[id] = (priority, log, jobs)
         scheduler = ServiceManager.get("workqueue", "scheduler")
-        scheduler.schedule(items, id, log)
+        scheduler.schedule(items, id, workflow.log, priority=workflow.priority)
 
         return core.Status.Scheduled
 
@@ -111,14 +115,11 @@ class WorkflowManager(object):
         iterable = []
 
         with utils.ignored(KeyError):
-            (priority, log, jobs) = cls.workflows[id]
+            workflow_helper = WorkflowHelper(cls.workflows[id])
+            iterable = workflow_helper.waiting()
 
-            for job in jobs:
-                if job.ready() and not job.completed():
-                    job.status = 'running'
-                    iterable.append(job)
-
-            cls.workflows[id] = (priority, log, jobs)
+            for job in iterable:
+                job.status = 'running'
 
         return iterable
 
@@ -129,10 +130,10 @@ class WorkflowManager(object):
         data = []
 
         with utils.ignored(KeyError):
-            (priority, log, jobs) = cls.workflows[id]
+            workflow_helper = WorkflowHelper(cls.workflows[id])
 
-            for job in jobs:
-                if job.status == 'running' and job.completed():
+            for job in workflow_helper.workflow.jobs:
+                if job.status == 'runnworkflow_helper.ing' and job.completed():
                     job.status = 'completed'
                 elif job.failed():
                     job.status = 'failed'
@@ -142,16 +143,7 @@ class WorkflowManager(object):
                     'description' : job.description,
                 })
 
-            cls.workflows[id] = (priority, log, jobs)
-            jobs = [job for job in jobs if not job.completed()]
-
-            if (any(job.failed() for job in jobs) or
-               any(job.status == 'failed' for job in jobs)):
-                status = core.Status.Failed
-            elif jobs:
-                status = core.Status.Running
-            else:
-                status = core.Status.Completed
+            status = workflow_helper.status()
 
         return (status, data)
 
@@ -163,7 +155,16 @@ class WorkflowManager(object):
         with utils.ignored(KeyError):
             scheduler = ServiceManager.get("workqueue", "scheduler")
             scheduler.cancel(id)
-            del cls.workflows[id]
+            workflow = cls.workflows[id]
+
+            for job in workflow.jobs:
+                if job.status == 'waiting':
+                    job.status = 'cancelled'
+                elif job.status == 'running':
+                    job.status = 'cancelled'
+                elif job.status == 'scheduled':
+                    job.status = 'cancelled'
+
             status = core.Status.Terminated
 
         return status

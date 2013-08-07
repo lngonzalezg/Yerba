@@ -10,7 +10,6 @@ _status_types = [
     "Completed",
     "Failed",
     "Terminated",
-    "Started",
     "Scheduled",
     "Attached",
     "Error"
@@ -19,7 +18,7 @@ _status_types = [
 def status_name(code):
     return _status_types[code]
 
-Status = namedtuple('Status', ' '.join(_status_types))._make(range(0, 10))
+Status = namedtuple('Status', ' '.join(_status_types))._make(range(0, 9))
 
 _status_messages = {
     Status.Attached: "The workflow {0} is Attached",
