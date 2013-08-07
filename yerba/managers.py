@@ -87,6 +87,10 @@ class WorkflowManager(object):
 
         try:
             workflow_helper = WorkflowHelper(cls.workflows[id])
+            if workflow_helper.status() == core.Status.Completed:
+                for job in workflow_helper.workflow.jobs:
+                    job.status = 'skipped'
+
             if workflow_helper.status() != core.Status.Terminated:
                 return core.Status.Scheduled
         except KeyError:
