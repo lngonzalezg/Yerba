@@ -50,18 +50,22 @@ def schedule_workflow(data):
 @route("cancel")
 def terminate_workflow(data):
     '''Terminates the job if it is running.'''
-    identity = data['id']
-    status = WorkflowManager.cancel(identity)
-    logger.info(core.status_message(identity, status))
+    try:
+        identity = data['id']
+        status = WorkflowManager.cancel(identity)
+        logger.info(core.status_message(identity, status))
 
-    return {"status" : core.status_name(status)}
+        return {"status" : core.status_name(status)}
+    except KeyError:
+        return {"status" : 'NotFound'}
 
 @route("get_status")
 def get_workflow_status(data):
     '''Gets the status of the workflow.'''
-    identity = data['id']
-
-    (status, jobs) = WorkflowManager.status(identity)
-    logger.info(core.status_message(identity, status))
-
-    return {"status" : core.status_name(status), "jobs" : jobs}
+    try:
+        identity = data['id']
+        (status, jobs) = WorkflowManager.status(identity)
+        logger.info(core.status_message(identity, status))
+        return {"status" : core.status_name(status), "jobs" : jobs}
+    except KeyError:
+        return {"status" : 'NotFound', "jobs" : {}}
