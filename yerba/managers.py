@@ -91,7 +91,7 @@ class WorkflowManager(object):
                 for job in workflow_helper.workflow.jobs:
                     job.status = 'skipped'
 
-            if (workflow_helper.status() != core.Status.Cancelled or
+            if (workflow_helper.status() != core.Status.Cancelled and
                 workflow_helper.status() != core.Status.Terminated):
                 return core.Status.Scheduled
         except KeyError:
