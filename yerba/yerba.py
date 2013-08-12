@@ -48,8 +48,8 @@ def schedule_workflow(data):
     return {"status" : core.status_name(status)}
 
 @route("cancel")
-def terminate_workflow(data):
-    '''Terminates the job if it is running.'''
+def cancel_workflow(data):
+    '''Cancels the job if it is running.'''
     try:
         identity = data['id']
         status = WorkflowManager.cancel(identity)
