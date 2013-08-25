@@ -28,8 +28,6 @@ def listen_forever(port, options=None):
 
     while True:
         ServiceManager.update()
-        logger.info("Waiting for a new request")
-
         if socket in dict(poller.poll(timeout=10)):
             msg = socket.recv_json(flags=zmq.NOBLOCK)
             response = None
