@@ -78,6 +78,7 @@ class WorkQueueService(services.Service):
         '''
         for new_job in iterable:
             if not new_job.ready():
+                logger.info("Job %s not ready.", str(new_job))
                 continue
 
             skip = False
@@ -89,7 +90,7 @@ class WorkQueueService(services.Service):
                         names.append(name)
 
                     self.tasks[taskid] = (names, log, job)
-                    logger.info("The job is already running skipping.")
+                    logger.info("Job is already scheduled and running.")
                     skip = True
                     break
 
@@ -126,6 +127,9 @@ class WorkQueueService(services.Service):
 
             if not task:
                 break
+
+            if task.id not in self.tasks:
+                logger.info("The task %s is not in the queue.", task.cmd)
 
             logger.info("Task returned: %d", task.return_status)
             logger.info("Fetching new jobs to be run.")

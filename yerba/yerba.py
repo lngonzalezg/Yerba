@@ -21,12 +21,14 @@ def listen_forever(port, options=None):
     connection_string = "tcp://*:{}".format(port)
     context = zmq.Context()
     socket = context.socket(zmq.REP)
+    socket.set(zmq.LINGER, 1000)
     socket.bind(connection_string)
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
 
     while True:
         ServiceManager.update()
+        logger.info("Waiting for a new request")
 
         if socket in dict(poller.poll(timeout=10)):
             msg = socket.recv_json(flags=zmq.NOBLOCK)
@@ -36,9 +38,10 @@ def listen_forever(port, options=None):
                 response = dispatch(msg)
 
             if not response:
-                response = {"status" : 'error'}
+                logger.info("Invalid request: %s", msg)
+                response = {"status" : "error"}
 
-            socket.send_json(response)
+            socket.send_json(response, flags=zmq.NOBLOCK)
 
 
 @route("schedule")
@@ -54,7 +57,6 @@ def cancel_workflow(data):
         identity = data['id']
         status = WorkflowManager.cancel(identity)
         logger.info(core.status_message(identity, status))
-
         return {"status" : core.status_name(status)}
     except KeyError:
         return {"status" : 'NotFound'}
