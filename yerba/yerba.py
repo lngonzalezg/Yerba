@@ -41,8 +41,8 @@ def listen_forever(port, options=None):
                 logger.info("Invalid request: %s", msg)
                 response = {"status" : "error"}
 
-            socket.send_json(response, flags=zmq.NOBLOCK)
-
+            with utils.ignored(zmq.Again):
+                socket.send_json(response, flags=zmq.NOBLOCK)
 
 @route("schedule")
 def schedule_workflow(data):
