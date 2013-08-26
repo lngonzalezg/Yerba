@@ -70,6 +70,7 @@ class WorkQueueService(services.Service):
         '''
         Removes all jobs from the queue and stops the work queue.
         '''
+        logger.info("Stopping workqueue")
         self.queue.shutdown_workers(0)
 
     def schedule(self, iterable, name, log, priority=None):
@@ -130,6 +131,7 @@ class WorkQueueService(services.Service):
 
             if task.id not in self.tasks:
                 logger.info("The task %s is not in the queue.", task.cmd)
+                continue
 
             logger.info("Task returned: %d", task.return_status)
             logger.info("Fetching new jobs to be run.")
@@ -165,12 +167,14 @@ class WorkQueueService(services.Service):
             (names, log, job) = item
 
             if name in names:
+                logger.info("Removed %s from job: %s", name, job)
                 names.remove(name)
             else:
                 continue
 
             if not names:
                 del self.tasks[taskid]
+                logger.info("Cancelled job %s in workqueue", job)
                 self.queue.cancel_by_taskid(taskid)
             else:
                 self.tasks[taskid] = (names, log, job)
