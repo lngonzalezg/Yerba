@@ -85,18 +85,6 @@ class WorkflowManager(object):
             logger.exception("The workflow could not be generated.")
             return core.Status.Error
 
-        try:
-            workflow_helper = WorkflowHelper(cls.workflows[id])
-            if workflow_helper.status() == core.Status.Completed:
-                for job in workflow_helper.workflow.jobs:
-                    job.status = 'skipped'
-
-            if (workflow_helper.status() != core.Status.Cancelled and
-                workflow_helper.status() != core.Status.Terminated):
-                return core.Status.Scheduled
-        except KeyError:
-            pass
-
         cls.workflows[id] = workflow
         items = []
 
