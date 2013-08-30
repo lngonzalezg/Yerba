@@ -130,7 +130,7 @@ class WorkQueueService(services.Service):
                 break
 
             if task.id not in self.tasks:
-                logger.info("The task %s is not in the queue.", task.cmd)
+                logger.info("The task %s is not in the queue.", str(task))
                 continue
 
             logger.info("Task returned: %d", task.return_status)
