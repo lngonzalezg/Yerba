@@ -35,8 +35,6 @@ def main():
 
     if not result:
         print("Unable to connect to the job engine.")
-    else:
-        print result
 
     socket.close()
     context.term()
