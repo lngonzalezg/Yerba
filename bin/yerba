@@ -1,0 +1,45 @@
+#!/usr/bin/env python
+import itertools
+
+
+import zmq
+
+_defaults = {
+    'connection' : 'tcp://localhost:5151',
+    'max_attempts' : 30,
+    'timeout' : 1000
+}
+
+def main():
+    context = zmq.Context()
+    socket = context.socket(zmq.REQ)
+    socket.setsockopt(zmq.LINGER, 0)
+    socket.connect(_defaults['connection'])
+
+    request = {
+        'request' : 'get_status',
+        'data' : { 'id' : 1 }
+    }
+
+    poller = zmq.Poller()
+    poller.register(socket, zmq.POLLIN)
+    counter = itertools.count()
+
+    socket.send_json(request, zmq.NOBLOCK)
+
+    result = None
+
+    while _defaults['max_attempts'] > counter.next() and not result:
+        if socket in dict(poller.poll(timeout=_defaults['timeout'])):
+            result = socket.recv_json(flags=zmq.NOBLOCK)
+
+    if not result:
+        print("Unable to connect to the job engine.")
+    else:
+        print result
+
+    socket.close()
+    context.term()
+
+if __name__ == '__main__':
+    main()
