@@ -38,6 +38,7 @@ def main(args=None):
             '%(asctime)s %(name)s [%(levelname)s] %(message)s',
              datefmt='%m/%d/%Y %I:%M:%S')
 
+
         filehandler = loghandlers.TimedRotatingFileHandler(
                 options['logfile'], 'midnight')
 
@@ -48,8 +49,12 @@ def main(args=None):
         streamhandler.setLevel(logging.INFO)
         streamhandler.setFormatter(fmt)
 
-        logger.addHandler(filehandler)
+        bufferhandler = loghandlers.MemoryHandler(1024, target=filehandler)
+        bufferhandler.setLevel(logging.INFO)
+        bufferhandler.setFormatter(fmt)
+
         logger.addHandler(streamhandler)
+        logger.addHandler(bufferhandler)
 
     logger.setLevel(getattr(logging, options['loglevel'].upper(), None))
     yerba.listen_forever(port = options['port'], options = options)
