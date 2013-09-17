@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 import itertools
+import os
+import subprocess
 
 
 import zmq
 
+_path = os.path.dirname(__file__)
 _defaults = {
     'connection' : 'tcp://localhost:5151',
+    'log' : "%s/yerba.log" % _path,
     'max_attempts' : 30,
     'timeout' : 1000
 }
@@ -35,6 +39,9 @@ def main():
 
     if not result:
         print("Unable to connect to the job engine.")
+
+        if os.path.exists(_defaults["log"]):
+            print subprocess.check_output(["tail", "-n", "150", _defaults["log"]])
 
     socket.close()
     context.term()
