@@ -122,42 +122,40 @@ class WorkQueueService(services.Service):
 
         If a task is completed new tasks from the workflow will be scheduled.
         '''
+        task = self.queue.wait(0)
 
-        while not self.queue.empty():
-            task = self.queue.wait(0)
+        if not task:
+            return
 
-            if not task:
-                break
+        if task.id not in self.tasks:
+            logger.info("The task %s is not in the queue.", str(task))
+            return
 
-            if task.id not in self.tasks:
-                logger.info("The task %s is not in the queue.", str(task))
-                continue
+        logger.info("Task returned: %d", task.return_status)
+        logger.info("Fetching new jobs to be run.")
+        (names, log, job) = self.tasks[task.id]
+        job.task_info = task
+        items = {}
 
-            logger.info("Task returned: %d", task.return_status)
-            logger.info("Fetching new jobs to be run.")
-            (names, log, job) = self.tasks[task.id]
-            job.task_info = task
-            items = {}
+        if job.completed():
+            for name in names:
+                iterable = managers.WorkflowManager.fetch(name)
+                if iterable:
+                    items[name] = iterable
 
-            if job.completed():
-                for name in names:
-                    iterable = managers.WorkflowManager.fetch(name)
-                    if iterable:
-                        items[name] = iterable
+            del self.tasks[task.id]
+            write_to_log(log, task)
+        elif not job.failed():
+            job.restart()
+            for name in names:
+                items[name] = [job]
+            del self.tasks[task.id]
+        else:
+            write_to_log(log, task)
+            del self.tasks[task.id]
 
-                del self.tasks[task.id]
-                write_to_log(log, task)
-            elif not job.failed():
-                job.restart()
-                for name in names:
-                    items[name] = [job]
-                del self.tasks[task.id]
-            else:
-                write_to_log(log, task)
-                del self.tasks[task.id]
-
-            for (name, iterable) in items.items():
-                self.schedule(iterable, name, log)
+        for (name, iterable) in items.items():
+            self.schedule(iterable, name, log)
 
     def cancel(self, name):
         '''
