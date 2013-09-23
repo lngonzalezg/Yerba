@@ -29,7 +29,12 @@ def listen_forever(port, options=None):
     while True:
         ServiceManager.update()
         if socket in dict(poller.poll(timeout=10)):
-            msg = socket.recv_json(flags=zmq.NOBLOCK)
+            try:
+                msg = socket.recv_json(flags=zmq.NOBLOCK)
+            except Exception:
+                logger.exception("The message is not valid json.")
+                continue
+
             response = None
 
             if not msg:
