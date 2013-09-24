@@ -21,7 +21,7 @@ def listen_forever(port, options=None):
     connection_string = "tcp://*:{}".format(port)
     context = zmq.Context()
     socket = context.socket(zmq.REP)
-    socket.set(zmq.LINGER, 1000)
+    socket.set(zmq.LINGER, 0)
     socket.bind(connection_string)
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
@@ -32,8 +32,7 @@ def listen_forever(port, options=None):
             try:
                 msg = socket.recv_json(flags=zmq.NOBLOCK)
             except Exception:
-                logger.exception("The message is not valid json.")
-                continue
+                logger.exception("The message was not parsed")
 
             response = None
 
