@@ -32,6 +32,7 @@ def listen_forever(port, options=None):
             try:
                 msg = socket.recv_json(flags=zmq.NOBLOCK)
             except Exception:
+                msg = None
                 logger.exception("The message was not parsed")
 
             response = None
