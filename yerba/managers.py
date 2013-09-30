@@ -138,6 +138,9 @@ class WorkflowManager(object):
 
             status = workflow_helper.status()
 
+        if status == core.Status.Completed:
+            workflow_helper.log()
+
         return (status, data)
 
     @classmethod

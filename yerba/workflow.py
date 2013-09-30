@@ -7,12 +7,6 @@ import utils
 from services import Service
 logger = logging.getLogger('yerba.workflow')
 
-def log_skipped_job(log, job):
-    with open(log, 'a') as fp:
-        fp.write('#' * 25 + '\n')
-        fp.write("Job: %s\n" % job)
-        fp.write("Skipped: The analysis was previously generated.\n")
-        fp.write('#' * 25 + '\n\n')
 
 def _format_args(args):
     argstring = ""
@@ -37,6 +31,7 @@ class Job(object):
         self.retries = retries
         self._status = 'waiting'
         self._description = description
+        self._logged = False
 
     @property
     def status(self):
@@ -71,6 +66,20 @@ class Job(object):
     def failed(self):
         return self.retries <= 0
 
+    def log(self, log):
+        with open(log, 'a') as fp:
+            if self._logged:
+                return
+
+            if self._status == 'skipped':
+                fp.write('#' * 25 + '\n')
+                fp.write('{0}\n'.format(self.description))
+                fp.write("Job: %s\n" % str(self))
+                fp.write("Skipped: The analysis was previously generated.\n")
+                fp.write('#' * 25 + '\n\n')
+
+        self._logged = True
+
     def __eq__(self, other):
         return (sorted(other.inputs) == sorted(self.inputs) and
                 sorted(other.outputs) == sorted(self.outputs) and
@@ -89,6 +98,13 @@ class WorkflowHelper(object):
     @property
     def workflow(self):
         return self._workflow
+
+    def log(self):
+        '''
+        Logs the results of workflow.
+        '''
+        for job in self.workflow.jobs:
+            job.log(self.workflow.log)
 
     def waiting(self):
         '''
