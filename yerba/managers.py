@@ -117,6 +117,13 @@ class WorkflowManager(object):
         return iterable
 
     @classmethod
+    def update(cls, id, job, info):
+        '''Updates the job with details'''
+        with utils.ignored(KeyError):
+            workflow_helper = WorkflowHelper(cls.workflows[id])
+            workflow_helper.add_job_info(job, info)
+
+    @classmethod
     def status(cls, id):
         '''Gets the status of the current workflow.'''
         status = core.Status.NotFound
@@ -137,6 +144,10 @@ class WorkflowManager(object):
                 })
 
             status = workflow_helper.status()
+
+        if status == core.Status.Completed:
+            workflow_helper.log()
+            cls.workflows[id]._logged = True
 
         return (status, data)
 

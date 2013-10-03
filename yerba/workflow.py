@@ -7,12 +7,6 @@ import utils
 from services import Service
 logger = logging.getLogger('yerba.workflow')
 
-def log_skipped_job(log, job):
-    with open(log, 'a') as fp:
-        fp.write('#' * 25 + '\n')
-        fp.write("Job: %s\n" % job)
-        fp.write("Skipped: The analysis was previously generated.\n")
-        fp.write('#' * 25 + '\n\n')
 
 def _format_args(args):
     argstring = ""
@@ -37,6 +31,7 @@ class Job(object):
         self.retries = retries
         self._status = 'waiting'
         self._description = description
+        self._info = None
 
     @property
     def status(self):
@@ -45,6 +40,14 @@ class Job(object):
     @status.setter
     def status(self, value):
         self._status = value
+
+    @property
+    def info(self):
+        return self._info
+
+    @info.setter
+    def info(self, info):
+        self._info = info
 
     @property
     def description(self):
@@ -108,6 +111,45 @@ class WorkflowHelper(object):
         '''
         return {job for job in self._workflow.jobs if job.ready()}
 
+    def add_job_info(self, selected, info):
+        '''
+        Adds job information for the selected job
+        '''
+        for job in self._workflow.jobs:
+            if job == selected:
+                job.info = info
+
+    def log(self):
+        '''
+        Logs the results of workflow.
+        '''
+        if self._workflow._logged:
+            return
+
+        self._workflow._logged = True
+
+        with open(self._workflow.log, 'a') as fp:
+            for job in self._workflow.jobs:
+                if job.status == 'skipped':
+                    fp.write('#' * 25 + '\n')
+                    fp.write('{0}\n'.format(job.description))
+                    fp.write("Job: %s\n" % str(job))
+                    fp.write("Skipped: The analysis was previously generated.\n")
+                    fp.write('#' * 25 + '\n\n')
+                elif job.info:
+                    msg = ("Job: {cmd}\n"
+                        "Submitted at: {started}\n"
+                        "Completed at: {ended}\n"
+                        "Execution time: {elapsed} sec\n"
+                        "Assigned to task: {taskid}\n"
+                        "Return status: {returned}\n"
+                        "{output}")
+
+                    fp.write('#' * 25 + '\n')
+                    fp.write('{0}\n'.format(job.description))
+                    fp.write(msg.format(**job.info))
+                    fp.write('#' * 25 + '\n\n')
+
     def status(self):
         '''
         Return the status of the workflow
@@ -130,6 +172,7 @@ class Workflow(object):
         self._log = log
         self._priority = priority
         self._jobs = jobs
+        self._logged = False
 
     @property
     def jobs(self):

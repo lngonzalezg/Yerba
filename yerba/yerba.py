@@ -21,7 +21,7 @@ def listen_forever(port, options=None):
     connection_string = "tcp://*:{}".format(port)
     context = zmq.Context()
     socket = context.socket(zmq.REP)
-    socket.set(zmq.LINGER, 1000)
+    socket.set(zmq.LINGER, 0)
     socket.bind(connection_string)
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
@@ -29,7 +29,12 @@ def listen_forever(port, options=None):
     while True:
         ServiceManager.update()
         if socket in dict(poller.poll(timeout=10)):
-            msg = socket.recv_json(flags=zmq.NOBLOCK)
+            try:
+                msg = socket.recv_json(flags=zmq.NOBLOCK)
+            except Exception:
+                msg = None
+                logger.exception("The message was not parsed")
+
             response = None
 
             if not msg:

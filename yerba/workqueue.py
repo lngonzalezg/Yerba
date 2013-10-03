@@ -12,34 +12,28 @@ import managers
 
 logger = logging.getLogger('yerba.workqueue')
 
-DIV = 1000000.0
-_dateformat="%d/%m/%y at %I:%M:%S%p"
 PROJECT_NAME = "yerba"
 
-def write_to_log(logfile, task):
-    with open(str(logfile), 'a') as fp:
-        dt1 = datetime.datetime.fromtimestamp(task.submit_time / DIV)
-        start_time = dt1.strftime(_dateformat)
+def get_task_info(task):
+    dateformat="%d/%m/%y at %I:%M:%S%p"
+    DIV = 1000000.0
 
-        dt2 = datetime.datetime.fromtimestamp(task.finish_time / DIV)
-        finish_time = dt2.strftime(_dateformat)
-        execution_time = task.cmd_execution_time / DIV
+    dt1 = datetime.datetime.fromtimestamp(task.submit_time / DIV)
+    start_time = dt1.strftime(dateformat)
 
-        msg = ("Job: {command}\n"
-            "Submitted at: {start_date}\n"
-            "Completed at: {end_date}\n"
-            "Execution time: {delta} sec\n"
-            "Assigned to task: {id}\n"
-            "Return status: {status}\n"
-            "{task}\n")
+    dt2 = datetime.datetime.fromtimestamp(task.finish_time / DIV)
+    finish_time = dt2.strftime(dateformat)
+    execution_time = task.cmd_execution_time / DIV
 
-        fp.write(msg.format(command=task.command,
-            start_date=start_time,
-            end_date=finish_time,
-            delta=execution_time,
-            id=task.id,
-            status = task.return_status,
-            task = task.output))
+    return {
+        'cmd' : task.command,
+        'started' : start_time,
+        'ended' : finish_time,
+        'elapsed' : execution_time,
+        'taskid' : task.id,
+        'returned' : task.return_status,
+        'output' : task.output,
+    }
 
 class WorkQueueService(services.Service):
     name = "workqueue"
@@ -144,14 +138,15 @@ class WorkQueueService(services.Service):
                     items[name] = iterable
 
             del self.tasks[task.id]
-            write_to_log(log, task)
+
+            managers.WorkflowManager.update(name, job, get_task_info(task))
         elif not job.failed():
             job.restart()
             for name in names:
                 items[name] = [job]
             del self.tasks[task.id]
         else:
-            write_to_log(log, task)
+            managers.WorkflowManager.update(name, job, get_task_info(task))
             del self.tasks[task.id]
 
         for (name, iterable) in items.items():
