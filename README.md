@@ -18,8 +18,8 @@ Additionally, work_queue_workers are required for any work to be completed
 locally. The bin directory contains the daemon _yerbad_ and the client _yerba_.
 
 ### Configure startup scripts
-The job engine comes with three init scripts _work_queue_pool_,
-_catalog_server_, and _yerba_. These scripts should be placed into init.d
+The job engine comes with three init scripts *work_queue_pool*, *catalog_server
+ and *yerba*. These scripts should be placed into init.d
 directory and setup to start at boot time.
 
 ```bash
