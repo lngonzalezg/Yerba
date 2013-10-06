@@ -7,8 +7,7 @@ Dependencies
 ------------
 
  * pyzmq
- * [cctools](http://www3.nd.edu/~ccl/software/download.shtml) catalog_server
-   and work_queue_worker
+ * [cctools](http://www3.nd.edu/~ccl/software/download.shtml)
 
 Installation
 ------------
@@ -18,7 +17,7 @@ python bindings to work_queue where Yerba sends work to be completed.
 Additionally, work_queue_workers are required for any work to be completed
 locally. The bin directory contains the daemon _yerbad_ and the client _yerba_.
 
-# Configure startup scripts
+### Configure startup scripts
 The job engine comes with three init scripts _work_queue_pool_,
 _catalog_server_, and _yerba_. These scripts should be placed into init.d
 directory and setup to start at boot time.
