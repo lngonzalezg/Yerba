@@ -7,7 +7,7 @@ Dependencies
 ------------
 
  * pyzmq
- * (cctools)[http://www3.nd.edu/~ccl/software/download.shtml] catalog_server
+ * [cctools](http://www3.nd.edu/~ccl/software/download.shtml) catalog_server
    and work_queue_worker
 
 Installation
