@@ -136,17 +136,19 @@ class WorkQueueService(services.Service):
                 iterable = managers.WorkflowManager.fetch(name)
                 if iterable:
                     items[name] = iterable
+                managers.WorkflowManager.update(name, job, get_task_info(task))
 
             del self.tasks[task.id]
 
-            managers.WorkflowManager.update(name, job, get_task_info(task))
         elif not job.failed():
             job.restart()
             for name in names:
                 items[name] = [job]
             del self.tasks[task.id]
         else:
-            managers.WorkflowManager.update(name, job, get_task_info(task))
+            for name in names:
+                managers.WorkflowManager.update(name, job, get_task_info(task))
+
             del self.tasks[task.id]
 
         for (name, iterable) in items.items():
