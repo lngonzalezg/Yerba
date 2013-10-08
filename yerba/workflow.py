@@ -130,12 +130,11 @@ class WorkflowHelper(object):
 
         with open(self._workflow.log, 'a') as fp:
             for job in self._workflow.jobs:
+                fp.write('#' * 25 + '\n')
                 if job.status == 'skipped':
-                    fp.write('#' * 25 + '\n')
                     fp.write('{0}\n'.format(job.description))
                     fp.write("Job: %s\n" % str(job))
                     fp.write("Skipped: The analysis was previously generated.\n")
-                    fp.write('#' * 25 + '\n\n')
                 elif job.info:
                     msg = ("Job: {cmd}\n"
                         "Submitted at: {started}\n"
@@ -144,11 +143,13 @@ class WorkflowHelper(object):
                         "Assigned to task: {taskid}\n"
                         "Return status: {returned}\n"
                         "{output}")
-
-                    fp.write('#' * 25 + '\n')
                     fp.write('{0}\n'.format(job.description))
                     fp.write(msg.format(**job.info))
-                    fp.write('#' * 25 + '\n\n')
+                else:
+                    fp.write('{0}\n'.format(job.description))
+                    fp.write("Job: %s\n" % str(job))
+                    fp.write("The job was not run.")
+                fp.write('#' * 25 + '\n\n')
 
     def status(self):
         '''

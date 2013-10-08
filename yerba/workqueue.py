@@ -144,6 +144,8 @@ class WorkQueueService(services.Service):
             job.restart()
             for name in names:
                 items[name] = [job]
+                managers.WorkflowManager.update(name, job, get_task_info(task))
+
             del self.tasks[task.id]
         else:
             for name in names:
