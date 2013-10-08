@@ -34,7 +34,7 @@ start() {
 
 stop() {
     echo "Yerba stopped"
-    pkill -SIGKILL -f 'yerbad'
+    pkill -SIGSTOP -f 'yerbad'
 }
 
 status() {
