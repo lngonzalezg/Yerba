@@ -1,4 +1,5 @@
 import argparse
+import atexit
 import logging
 import os
 import time
@@ -25,6 +26,7 @@ def listen_forever(port, options=None):
     socket.bind(connection_string)
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
+    atexit.register(shutdown)
 
     while True:
         ServiceManager.update()
@@ -53,6 +55,8 @@ def listen_forever(port, options=None):
             except zmq.Again:
                 logger.exception("Failed to respond with response %s",
                     response)
+def shutdown():
+    ServiceManager.stop()
 
 @route("schedule")
 def schedule_workflow(data):
