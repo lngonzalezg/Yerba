@@ -145,9 +145,9 @@ class WorkflowManager(object):
 
             status = workflow_helper.status()
 
-        if status != core.Status.Running:
-            workflow_helper.log()
-            cls.workflows[id]._logged = True
+            if status != core.Status.Running:
+                workflow_helper.log()
+                cls.workflows[id]._logged = True
 
         return (status, data)
 
