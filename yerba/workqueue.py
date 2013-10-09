@@ -55,6 +55,7 @@ class WorkQueueService(services.Service):
         self.tasks = {}
 
         try:
+            set_debug_flag()
             self.queue = WorkQueue(name=self.project_name, catalog=True)
             logger.info("Started work queue master on port %d", self.port)
         except Exception:
