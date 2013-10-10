@@ -148,7 +148,7 @@ class WorkflowHelper(object):
                 else:
                     fp.write('{0}\n'.format(job.description))
                     fp.write("Job: %s\n" % str(job))
-                    fp.write("The job was not run.")
+                    fp.write("The job was not run.\n")
                 fp.write('#' * 25 + '\n\n')
 
     def status(self):
