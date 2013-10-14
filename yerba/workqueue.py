@@ -57,6 +57,7 @@ class WorkQueueService(services.Service):
         try:
             set_debug_flag('debug')
             self.queue = WorkQueue(name=self.project_name, catalog=True)
+
             logger.info("Started work queue master on port %d", self.port)
         except Exception:
             raise InitializeServiceException('Unable to start the work_queue')
@@ -68,7 +69,7 @@ class WorkQueueService(services.Service):
         logger.info("Stopping workqueue")
         self.queue.shutdown_workers(0)
 
-    def schedule(self, iterable, name, log, priority=None):
+    def schedule(self, iterable, name, priority=None):
         '''
         Schedules jobs into work_queue
         '''
@@ -80,12 +81,12 @@ class WorkQueueService(services.Service):
             skip = False
 
             for (taskid, item) in self.tasks.items():
-                (names, log, job) = item
+                (names, job) = item
                 if new_job == job:
                     if name not in names:
                         names.append(name)
 
-                    self.tasks[taskid] = (names, log, job)
+                    self.tasks[taskid] = (names, job)
                     logger.info("Job is already scheduled and running.")
                     skip = True
                     break
@@ -109,7 +110,7 @@ class WorkQueueService(services.Service):
             new_id = self.queue.submit(task)
 
             logger.info("Scheduled job with id: %s", new_id)
-            self.tasks[new_id] = ([name], log, new_job)
+            self.tasks[new_id] = ([name], new_job)
 
     def update(self):
         '''
@@ -128,7 +129,7 @@ class WorkQueueService(services.Service):
 
         logger.info("Task returned: %d", task.return_status)
         logger.info("Fetching new jobs to be run.")
-        (names, log, job) = self.tasks[task.id]
+        (names, job) = self.tasks[task.id]
         job.task_info = task
         items = {}
 
@@ -155,14 +156,14 @@ class WorkQueueService(services.Service):
             del self.tasks[task.id]
 
         for (name, iterable) in items.items():
-            self.schedule(iterable, name, log)
+            self.schedule(iterable, name)
 
     def cancel(self, name):
         '''
         Removes the jobs based on there job id task id from the queue.
         '''
         for (taskid, item) in self.tasks.items():
-            (names, log, job) = item
+            (names, job) = item
 
             if name in names:
                 logger.info("Removed %s from job: %s", name, job)
@@ -175,5 +176,5 @@ class WorkQueueService(services.Service):
                 logger.info("Cancelled job %s in workqueue", job)
                 self.queue.cancel_by_taskid(taskid)
             else:
-                self.tasks[taskid] = (names, log, job)
+                self.tasks[taskid] = (names, job)
 
