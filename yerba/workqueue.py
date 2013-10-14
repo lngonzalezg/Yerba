@@ -44,6 +44,9 @@ class WorkQueueService(services.Service):
     def set_project(cls, name):
         cls.project_name = name
 
+    def workqueue_log(self, filename):
+        self.queue.specify_log(filename)
+
     def initialize(self):
         '''
         Initializes work_queue for scheduling workers.

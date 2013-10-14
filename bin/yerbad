@@ -15,6 +15,7 @@ _defaults = {
     'logging' : os.path.join(_path, 'logging.conf'),
     'logfile' : os.path.join(_path, 'yerba.log'),
     'loglevel' : 'WARN',
+    'wqlog' : os.path.join(_path, 'workqueue.log'),
     'queue_prefix' : 'yerba'
 }
 

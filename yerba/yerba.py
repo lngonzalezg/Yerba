@@ -13,10 +13,13 @@ import utils
 import core
 
 logger = logging.getLogger('yerba')
+running = True
 
 def listen_forever(port, options=None):
     WorkQueueService.set_project(options['queue_prefix'])
-    ServiceManager.register(WorkQueueService())
+    wq = WorkQueueService()
+    wq.workqueue_log(options['wqlog'])
+    ServiceManager.register(wq)
     ServiceManager.start()
 
     connection_string = "tcp://*:{}".format(port)
