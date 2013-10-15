@@ -123,12 +123,12 @@ class WorkflowHelper(object):
         '''
         Logs the results of workflow.
         '''
-        if self._workflow._logged:
+        if self.workflow._logged or not self.workflow.log:
             return
 
         self._workflow._logged = True
 
-        with open(self._workflow.log, 'a') as fp:
+        with open(self.workflow.log, 'a') as fp:
             for job in self._workflow.jobs:
                 fp.write('#' * 25 + '\n')
                 if job.status == 'skipped':
