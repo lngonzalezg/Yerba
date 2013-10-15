@@ -18,9 +18,9 @@ running = True
 def listen_forever(port, options=None):
     WorkQueueService.set_project(options['queue_prefix'])
     wq = WorkQueueService()
-    wq.workqueue_log(options['wqlog'])
     ServiceManager.register(wq)
     ServiceManager.start()
+    wq.workqueue_log(options['wqlog'])
 
     connection_string = "tcp://*:{}".format(port)
     context = zmq.Context()
