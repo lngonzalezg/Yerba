@@ -260,7 +260,7 @@ def generate_workflow(pyobject):
             new_job.outputs.extend(sorted(outputs))
 
         if 'overwrite' in job and int(job['overwrite']):
-            logger.info("The job will be restarted.")
+            logger.debug("The job will be restarted:\n%s", new_job)
             new_job.clear()
 
         jobs.append(new_job)
