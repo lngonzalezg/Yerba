@@ -47,11 +47,11 @@ def main(args=None):
         filehandler.setFormatter(fmt)
 
         streamhandler = logging.StreamHandler()
-        streamhandler.setLevel(logging.INFO)
+        streamhandler.setLevel(logging.DEBUG)
         streamhandler.setFormatter(fmt)
 
         bufferhandler = loghandlers.MemoryHandler(1024, target=filehandler)
-        bufferhandler.setLevel(logging.INFO)
+        bufferhandler.setLevel(logging.DEBUG)
         bufferhandler.setFormatter(fmt)
 
         logger.addHandler(streamhandler)
