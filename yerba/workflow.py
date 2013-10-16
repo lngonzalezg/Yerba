@@ -134,6 +134,19 @@ class WorkflowHelper(object):
             if job == selected:
                 job.info = info
 
+    def message(self):
+        message = ("name: {0}, completed: {1}, failed: {2}, running: {3},",
+        " waiting: {4}")
+
+        jobs = (self.workflow.name,
+            len(self.completed()),
+            len(self.running()),
+            len(self.failed()),
+            len(self.waiting()))
+
+        return "".join(message).format(*jobs)
+
+
     def log(self):
         '''
         Logs the results of workflow.
