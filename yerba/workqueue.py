@@ -130,10 +130,10 @@ class WorkQueueService(services.Service):
             logger.info("The task %s is not in the queue.", str(task))
             return
 
-        logger.info("Task returned: %d", task.return_status)
-        logger.info("Fetching new jobs to be run.")
         (names, job) = self.tasks[task.id]
-        job.task_info = task
+        info = get_task_info(task)
+        logger.info("Task returned: %d", task.return_status)
+
         items = {}
 
         if job.completed():
@@ -141,7 +141,7 @@ class WorkQueueService(services.Service):
                 iterable = managers.WorkflowManager.fetch(name)
                 if iterable:
                     items[name] = iterable
-                managers.WorkflowManager.update(name, job, get_task_info(task))
+                managers.WorkflowManager.update(name, job, info)
 
             del self.tasks[task.id]
 
@@ -149,15 +149,16 @@ class WorkQueueService(services.Service):
             job.restart()
             for name in names:
                 items[name] = [job]
-                managers.WorkflowManager.update(name, job, get_task_info(task))
+                managers.WorkflowManager.update(name, job, info)
 
             del self.tasks[task.id]
         else:
             for name in names:
-                managers.WorkflowManager.update(name, job, get_task_info(task))
+                managers.WorkflowManager.update(name, job, info)
 
             del self.tasks[task.id]
 
+        logger.info("Fetching new jobs to be run.")
         for (name, iterable) in items.items():
             self.schedule(iterable, name)
 
