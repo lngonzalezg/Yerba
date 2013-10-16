@@ -124,8 +124,10 @@ class WorkflowManager(object):
     def update(cls, id, job, info):
         '''Updates the job with details'''
         with utils.ignored(KeyError):
-            workflow_helper = WorkflowHelper(cls.workflows[id])
+            workflow = cls.workflows[id]
+            workflow_helper = WorkflowHelper(workflow)
             workflow_helper.add_job_info(job, info)
+            logger.info("Updating %s - %s workflow job %s", id, workflow.name, job)
 
     @classmethod
     def status(cls, id):
