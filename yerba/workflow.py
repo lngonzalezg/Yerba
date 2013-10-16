@@ -58,6 +58,9 @@ class Job(object):
             with utils.ignored(OSError):
                 os.remove(output)
 
+    def running(self):
+        return self._status == 'running'
+
     def completed(self):
         '''Returns whether or not the job was completed.'''
         missing = [fp for fp in self.outputs if not os.path.isfile(fp)]
