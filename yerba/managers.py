@@ -81,8 +81,12 @@ class WorkflowManager(object):
         '''Submits workflows to be scheduled'''
         try:
             (id, workflow) = generate_workflow(json)
-        except Exception:
+            logger.debug("%s - %s workflow submitted to the manager", workflow.name, id)
+        except (JobError, WorkflowError):
             logger.exception("The workflow could not be generated.")
+            return core.Status.Error
+        except Exception:
+            logger.exception("An unexpected error has occured")
             return core.Status.Error
 
         cls.workflows[id] = workflow
