@@ -131,6 +131,7 @@ class WorkflowManager(object):
 
         with utils.ignored(KeyError):
             workflow_helper = WorkflowHelper(cls.workflows[id])
+            logger.debug("id: %s, %s", id, workflow_helper.message())
 
             for job in workflow_helper.workflow.jobs:
                 if job.status == 'running' and job.completed():
