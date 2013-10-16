@@ -114,6 +114,18 @@ class WorkflowHelper(object):
         '''
         return {job for job in self._workflow.jobs if job.ready()}
 
+    def running(self):
+        '''
+        Return the set of jobs that are running
+        '''
+        return {job for job in self.workflow.jobs if job.running()}
+
+    def failed(self):
+        '''
+        Return the set of jobs that failed
+        '''
+        return {job for job in self.workflow.jobs if job.failed()}
+
     def add_job_info(self, selected, info):
         '''
         Adds job information for the selected job
