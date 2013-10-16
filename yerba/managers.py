@@ -98,7 +98,7 @@ class WorkflowManager(object):
                 job.status = 'scheduled'
 
         scheduler = ServiceManager.get("workqueue", "scheduler")
-        scheduler.schedule(items, id, workflow.log, priority=workflow.priority)
+        scheduler.schedule(items, id, priority=workflow.priority)
 
         return core.Status.Scheduled
 
