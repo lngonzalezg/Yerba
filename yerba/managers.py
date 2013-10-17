@@ -1,5 +1,7 @@
 from logging import getLogger
 from functools import wraps
+import datetime
+import time
 
 import core
 import utils
@@ -57,6 +59,8 @@ class ServiceManager(object):
         for service in cls.core.values():
             service.initialize()
 
+        cls.refresh = 10
+        cls.previous = time.time()
         cls.RUNNING = True
 
     @classmethod
@@ -65,6 +69,11 @@ class ServiceManager(object):
         for service in cls.core.values():
             service.update()
 
+        current_time = time.time()
+        if (current_time - cls.previous) > cls.refresh:
+            cls.previous = current_time
+            report_state()
+
     @classmethod
     def stop(cls):
         '''Stops the service manager and all core'''
@@ -72,6 +81,69 @@ class ServiceManager(object):
             service.stop()
 
         cls.RUNNING = False
+
+def report_state():
+    wq = ServiceManager.get("workqueue", "scheduler")
+
+    workflow_status = ["INTERNAL STATE CHECK\n----WORKFLOW STATUS--\n"]
+    for (id, workflow) in WorkflowManager.workflows.items():
+        helper = WorkflowHelper(workflow)
+        msg = "--WORKFLOW (status = {0}): {1} ({2})\n"
+        workflow_status.append(msg.format(helper.status(), id, helper.message()))
+
+
+    stats = wq.queue.stats
+
+    if len(workflow_status) < 2:
+        workflow_status.append("--No workflows found\n")
+
+
+    msg = ("---- Work Queue Info --\n"
+    "--The work queue started on {}\n"
+    "--The total time sending data to workers is {}\n"
+    "--The total time spent recieving data from the workers is {}\n"
+    "--The total number of bytes sent is {}\n"
+    "--The total number of bytes recieved is {}\n"
+    "--The total number of workers joined {}\n"
+    "--The total number of workers removed is {}\n"
+    "--The total number of tasks completed is {}\n"
+    "--The total number of tasks dispatched is {}\n"
+    "----- Task info --\n"
+    "--There are {} tasks waiting\n"
+    "--There are {} tasks completed\n"
+    "--There are {} tasks running\n"
+    "---- Worker info --\n"
+    "--There are {} workers initializing\n"
+    "--There are {} workers ready\n"
+    "--There are {} workers busy\n"
+    "--There are {} workers full")
+
+    dateformat="%d/%m/%y at %I:%M:%S%p"
+    DIV = 1000000.0
+
+    dt1 = datetime.datetime.fromtimestamp(stats.start_time/ DIV)
+    start_time = dt1.strftime(dateformat)
+
+    workqueue_status = msg.format(start_time,
+        stats.total_send_time,
+        stats.total_receive_time,
+        stats.total_bytes_sent,
+        stats.total_bytes_received,
+        stats.total_workers_joined,
+        stats.total_workers_removed,
+        stats.total_tasks_complete,
+        stats.total_tasks_dispatched,
+        stats.tasks_waiting,
+        stats.tasks_complete,
+        stats.tasks_running,
+        stats.workers_init,
+        stats.workers_ready,
+        stats.workers_busy,
+        stats.workers_full)
+
+    status = "".join(["".join(workflow_status), workqueue_status])
+    logger.debug(status)
+    time.sleep(1)
 
 class WorkflowManager(object):
     workflows = {}
