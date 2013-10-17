@@ -140,8 +140,8 @@ class WorkflowHelper(object):
 
         jobs = (self.workflow.name,
             len(self.completed()),
-            len(self.running()),
             len(self.failed()),
+            len(self.running()),
             len(self.waiting()))
 
         return "".join(message).format(*jobs)
