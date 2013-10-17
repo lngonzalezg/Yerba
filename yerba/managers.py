@@ -59,7 +59,7 @@ class ServiceManager(object):
         for service in cls.core.values():
             service.initialize()
 
-        cls.refresh = 10
+        cls.refresh = 300
         cls.previous = time.time()
         cls.RUNNING = True
 
