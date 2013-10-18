@@ -5,7 +5,7 @@ import time
 
 import core
 import utils
-from workflow import generate_workflow, WorkflowHelper
+from workflow import generate_workflow, WorkflowHelper, WorkflowError, JobError
 
 logger = getLogger('yerba.manager')
 SEPERATOR = '.'
@@ -153,12 +153,12 @@ class WorkflowManager(object):
         '''Submits workflows to be scheduled'''
         try:
             (id, workflow) = generate_workflow(json)
-            logger.debug("%s - %s workflow submitted to the manager", workflow.name, id)
+            logger.debug("WORKFLOW %s: submitted with id %s", workflow.name, id)
         except (JobError, WorkflowError):
-            logger.exception("The workflow could not be generated.")
+            logger.exception("WORKFLOW: the workflow failed to be generated")
             return core.Status.Error
         except Exception:
-            logger.exception("An unexpected error has occured")
+            logger.exception("WORKFLOW: An unexpected error occured during workflow generation")
             return core.Status.Error
 
         cls.workflows[id] = workflow
@@ -184,10 +184,13 @@ class WorkflowManager(object):
         iterable = []
 
         with utils.ignored(KeyError):
-            workflow_helper = WorkflowHelper(cls.workflows[id])
+            workflow = cls.workflows[id]
+            workflow_helper = WorkflowHelper(workflow)
             iterable = workflow_helper.waiting()
 
             for job in iterable:
+                logger.debug('WORKFLOW %s: changing job %s status to running',
+                        workflow.name, job)
                 job.status = 'running'
 
         return iterable
@@ -199,7 +202,8 @@ class WorkflowManager(object):
             workflow = cls.workflows[id]
             workflow_helper = WorkflowHelper(workflow)
             workflow_helper.add_job_info(job, info)
-            logger.info("Updating %s - %s workflow job %s", id, workflow.name, job)
+            logger.info("WORKFLOW %s: updating the job %s",
+                    workflow.name, job)
 
     @classmethod
     def status(cls, id):
@@ -208,8 +212,10 @@ class WorkflowManager(object):
         data = []
 
         with utils.ignored(KeyError):
-            workflow_helper = WorkflowHelper(cls.workflows[id])
-            logger.debug("id: %s, %s", id, workflow_helper.message())
+            workflow = cls.workflows[id]
+            workflow_helper = WorkflowHelper(workflow)
+            logger.debug("WORKFLOW %s: status check %s", workflow.name,
+                    workflow_helper.message())
 
             for job in workflow_helper.workflow.jobs:
                 if job.status == 'running' and job.completed():
@@ -236,9 +242,12 @@ class WorkflowManager(object):
         status = core.Status.NotFound
 
         with utils.ignored(KeyError):
+            workflow = cls.workflows[id]
+            logger.info(('WORKQUEUE %s: the workflow has been requested'
+            'to be cancelled'), workflow.name)
+
             scheduler = ServiceManager.get("workqueue", "scheduler")
             scheduler.cancel(id)
-            workflow = cls.workflows[id]
 
             for job in workflow.jobs:
                 if job.status == 'waiting':

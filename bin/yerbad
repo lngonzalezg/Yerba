@@ -35,10 +35,10 @@ def main(args=None):
         logger = logging.getLogger('yerba')
         logger.setLevel(options['loglevel'])
 
-        fmt = logging.Formatter(
-            '%(asctime)s %(name)s [%(levelname)s] %(message)s',
-             datefmt='%m/%d/%Y %I:%M:%S')
+        format_string = ('%(asctime)s %(name)s:%(lineno)s'
+            '[%(levelname)s] %(message)s')
 
+        fmt = logging.Formatter(format_string, datefmt='%m/%d/%Y %I:%M:%S')
 
         filehandler = loghandlers.TimedRotatingFileHandler(
                 options['logfile'], 'midnight')

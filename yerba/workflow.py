@@ -7,7 +7,6 @@ import utils
 from services import Service
 logger = logging.getLogger('yerba.workflow')
 
-
 def _format_args(args):
     argstring = ""
 
@@ -39,6 +38,7 @@ class Job(object):
 
     @status.setter
     def status(self, value):
+        logger.info('JOB: the status has been changed to %s', value)
         self._status = value
 
     @property
@@ -47,6 +47,8 @@ class Job(object):
 
     @info.setter
     def info(self, info):
+        logger.info("JOB (status: %s): The info field has been updated",
+                self.status)
         self._info = info
 
     @property
@@ -132,6 +134,8 @@ class WorkflowHelper(object):
         '''
         for job in self._workflow.jobs:
             if job == selected:
+                logger.info("WORKFLOW %s: Added info to job %s",
+                        self.workflow.name, job)
                 job.info = info
 
     def message(self):
@@ -232,6 +236,8 @@ def generate_workflow(pyobject):
     jobs = []
     logfile = pyobject['logfile']
 
+    logger.info("WORKFLOW %s: Generating workflow [id %s]", name, identity)
+
     for job in pyobject['jobs']:
         (cmd, script, args) = (job['cmd'], job['script'], job['args'])
 
@@ -240,27 +246,32 @@ def generate_workflow(pyobject):
         else:
             new_job = Job(cmd, script, args)
 
+        logger.debug("WORKFLOW %s: Creating job %s", name, new_job.description)
+
         if not cmd:
-            raise JobError("The command name is NoneType.")
+            raise JobError("WORKFLOW %s: The command name is NoneType." % name)
         if not args:
-            raise JobError("The arguments are NoneType.")
+            raise JobError("WORKFLOW %s: The arguments are NoneType." % name)
 
         if 'inputs' in job and job['inputs']:
             if any(fp is None for fp in job['inputs']):
-                raise JobError("Workflow %s has a NoneType input" % name)
+                msg = "WORKFLOW %s: The job has a NoneType input" % name
+                raise JobError(msg)
 
             inputs = [os.path.abspath(str(item)) for item in job['inputs']]
             new_job.inputs.extend(sorted(inputs))
 
         if 'outputs' in job:
             if any(fp is None for fp in job['outputs']):
-                raise JobError("Workflow %s has a NoneType output" % name)
+                msg = "WORKFLOW %s: The job has a NoneType output" % name
+                raise JobError(msg)
 
             outputs = [os.path.abspath(str(item)) for item in job['outputs']]
             new_job.outputs.extend(sorted(outputs))
 
         if 'overwrite' in job and int(job['overwrite']):
-            logger.debug("The job will be restarted:\n%s", new_job)
+            logger.debug(("WORKFLOW %s: The job will overwrite previous"
+                "results:\n%s"), name, new_job)
             new_job.clear()
 
         jobs.append(new_job)
