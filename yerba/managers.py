@@ -81,8 +81,12 @@ class WorkflowManager(object):
         '''Submits workflows to be scheduled'''
         try:
             (id, workflow) = generate_workflow(json)
-        except Exception:
+            logger.debug("%s - %s workflow submitted to the manager", workflow.name, id)
+        except (JobError, WorkflowError):
             logger.exception("The workflow could not be generated.")
+            return core.Status.Error
+        except Exception:
+            logger.exception("An unexpected error has occured")
             return core.Status.Error
 
         cls.workflows[id] = workflow
@@ -98,7 +102,7 @@ class WorkflowManager(object):
                 job.status = 'scheduled'
 
         scheduler = ServiceManager.get("workqueue", "scheduler")
-        scheduler.schedule(items, id, workflow.log, priority=workflow.priority)
+        scheduler.schedule(items, id, priority=workflow.priority)
 
         return core.Status.Scheduled
 
@@ -120,8 +124,10 @@ class WorkflowManager(object):
     def update(cls, id, job, info):
         '''Updates the job with details'''
         with utils.ignored(KeyError):
-            workflow_helper = WorkflowHelper(cls.workflows[id])
+            workflow = cls.workflows[id]
+            workflow_helper = WorkflowHelper(workflow)
             workflow_helper.add_job_info(job, info)
+            logger.info("Updating %s - %s workflow job %s", id, workflow.name, job)
 
     @classmethod
     def status(cls, id):
@@ -131,6 +137,7 @@ class WorkflowManager(object):
 
         with utils.ignored(KeyError):
             workflow_helper = WorkflowHelper(cls.workflows[id])
+            logger.debug("id: %s, %s", id, workflow_helper.message())
 
             for job in workflow_helper.workflow.jobs:
                 if job.status == 'running' and job.completed():

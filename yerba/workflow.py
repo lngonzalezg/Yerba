@@ -58,6 +58,9 @@ class Job(object):
             with utils.ignored(OSError):
                 os.remove(output)
 
+    def running(self):
+        return self._status == 'running'
+
     def completed(self):
         '''Returns whether or not the job was completed.'''
         missing = [fp for fp in self.outputs if not os.path.isfile(fp)]
@@ -111,6 +114,18 @@ class WorkflowHelper(object):
         '''
         return {job for job in self._workflow.jobs if job.ready()}
 
+    def running(self):
+        '''
+        Return the set of jobs that are running
+        '''
+        return {job for job in self.workflow.jobs if job.running()}
+
+    def failed(self):
+        '''
+        Return the set of jobs that failed
+        '''
+        return {job for job in self.workflow.jobs if job.failed()}
+
     def add_job_info(self, selected, info):
         '''
         Adds job information for the selected job
@@ -119,16 +134,29 @@ class WorkflowHelper(object):
             if job == selected:
                 job.info = info
 
+    def message(self):
+        message = ("name: {0}, completed: {1}, failed: {2}, running: {3},",
+        " waiting: {4}")
+
+        jobs = (self.workflow.name,
+            len(self.completed()),
+            len(self.running()),
+            len(self.failed()),
+            len(self.waiting()))
+
+        return "".join(message).format(*jobs)
+
+
     def log(self):
         '''
         Logs the results of workflow.
         '''
-        if self._workflow._logged:
+        if self.workflow._logged or not self.workflow.log:
             return
 
         self._workflow._logged = True
 
-        with open(self._workflow.log, 'a') as fp:
+        with open(self.workflow.log, 'a') as fp:
             for job in self._workflow.jobs:
                 fp.write('#' * 25 + '\n')
                 if job.status == 'skipped':
@@ -232,7 +260,7 @@ def generate_workflow(pyobject):
             new_job.outputs.extend(sorted(outputs))
 
         if 'overwrite' in job and int(job['overwrite']):
-            logger.info("The job will be restarted.")
+            logger.debug("The job will be restarted:\n%s", new_job)
             new_job.clear()
 
         jobs.append(new_job)
