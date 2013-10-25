@@ -40,8 +40,8 @@ class WorkQueueService(services.Service):
     group = "scheduler"
 
     @classmethod
-    def set_project(cls, name):
-        cls.name = name
+    def set_project(cls, project):
+        cls.project = project
 
     def workqueue_log(self, filename):
         self.queue.specify_log(filename)
@@ -58,10 +58,10 @@ class WorkQueueService(services.Service):
 
         try:
             set_debug_flag('debug')
-            self.queue = WorkQueue(name=self.name, catalog=True)
+            self.queue = WorkQueue(name=self.project, catalog=True)
 
             logger.info('WORKQUEUE %s: Starting work queue on port %s',
-                    self.name, self.queue.port)
+                    self.project, self.queue.port)
         except Exception:
             raise InitializeServiceException('Unable to start the work_queue')
 
@@ -70,7 +70,7 @@ class WorkQueueService(services.Service):
         Removes all jobs from the queue and stops the work queue.
         '''
         logger.info('WORKQUEUE %s: Stopping work queue on port %s',
-                self.name, self.queue.port)
+                self.project, self.queue.port)
         self.queue.shutdown_workers(0)
 
     def schedule(self, iterable, name, priority=None):
@@ -78,7 +78,7 @@ class WorkQueueService(services.Service):
         Schedules jobs into work_queue
         '''
         for new_job in iterable:
-            logger.info('WORKQUEUE %s: The workflow %s is scheduling job %s', self.name, name, new_job)
+            logger.info('WORKQUEUE %s: The workflow %s is scheduling job %s', self.project, name, new_job)
 
             if not new_job.ready():
                 logger.info('WORKFLOW %s: Job %s was not scheduled waiting on inputs', name, new_job)
@@ -93,7 +93,7 @@ class WorkQueueService(services.Service):
                         names.append(name)
 
                     logger.info(('WORKQUEUE %s: This job has already been'
-                        'assigned to task %s'), self.name, taskid)
+                        'assigned to task %s'), self.project, taskid)
 
                     self.tasks[taskid] = (names, job)
                     skip = True
@@ -117,7 +117,7 @@ class WorkQueueService(services.Service):
 
             new_id = self.queue.submit(task)
 
-            logger.info('WORKQUEUE %s: Task has been submited and assigned [id %s]', self.name, new_id)
+            logger.info('WORKQUEUE %s: Task has been submited and assigned [id %s]', self.project, new_id)
 
             self.tasks[new_id] = ([name], new_job)
 
@@ -133,13 +133,13 @@ class WorkQueueService(services.Service):
             return
 
         logger.info("WORKQUEUE %s: Fetching task from the work queue",
-                self.name)
+                self.project)
         logger.debug(('WORKQUEUE %s: Recieved task %s from work_queue with'
-            ' return_status %s'), self.name, task.id, task.return_status)
+            ' return_status %s'), self.project, task.id, task.return_status)
 
         if task.id not in self.tasks:
             logger.info(('WORKQUEUE %s: The job for id %s could ',
-                'not be found.'), self.name, task.id)
+                'not be found.'), self.project, task.id)
             return
 
         (names, job) = self.tasks[task.id]
@@ -151,7 +151,7 @@ class WorkQueueService(services.Service):
             for name in names:
                 fetch_message = ('WORKQUEUE %s: Fetching next jobs'
                         'in workflow %s')
-                logger.info(fetch_message, self.workflow, name)
+                logger.info(fetch_message, self.project, name)
                 iterable = managers.WorkflowManager.fetch(name)
                 if iterable:
                     items[name] = iterable
@@ -161,7 +161,7 @@ class WorkQueueService(services.Service):
 
         elif not job.failed():
             logger.info(('WORKQUEUE %s: The task %s failed attempting'
-                    'to rerun the task'), self.name, task.id)
+                    'to rerun the task'), self.project, task.id)
             job.restart()
             for name in names:
                 items[name] = [job]
@@ -170,7 +170,7 @@ class WorkQueueService(services.Service):
             del self.tasks[task.id]
         else:
             logger.info(('WORKQUEUE %s: The task %s failed notifying'
-                'workflows %s'), self.name, task.id, ', '.join(names))
+                'workflows %s'), self.project, task.id, ', '.join(names))
             for name in names:
                 managers.WorkflowManager.update(name, job, info)
 
@@ -197,11 +197,11 @@ class WorkQueueService(services.Service):
             if not names:
                 del self.tasks[taskid]
                 logger.info('WORKQUEUE %s: The task %s was cancelled',
-                    self.name, self.task.id)
+                    self.project, self.task.id)
                 self.queue.cancel_by_taskid(taskid)
             else:
                 msg = ('WORKQUEUE %s: The task %s was not cancelled '
                         'workflows %s depend on the task')
-                logger.info(msg, self.name, taskid, ', '.join(names))
+                logger.info(msg, self.project, taskid, ', '.join(names))
                 self.tasks[taskid] = (names, job)
 
