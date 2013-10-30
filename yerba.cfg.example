@@ -1,4 +1,13 @@
 [DEFAULT]
-port = 5151
+debug = False
+
+[yerba]
+port = 1234
 logging = '/etc/yerba/logging.conf'
-queue-prefix = test
+
+[workqueue]
+project = yerba
+log = "/var/log/workqueue.log"
+port = -1
+catalog_server = localhost
+catalog_port = 1024

@@ -2,46 +2,52 @@
 import argparse
 import ConfigParser as configparser
 import logging
+import logging.config
 import logging.handlers as loghandlers
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath('..'))
+_path = os.path.dirname(__file__)
+sys.path.insert(0, os.path.abspath(os.path.join(_path, '..')))
 from yerba import (yerba, utils)
 
-_path = os.path.dirname(__file__)
 _defaults = {
     'port' : 5151,
-    'logging' : os.path.join(_path, 'logging.conf'),
-    'logfile' : os.path.join(_path, 'yerba.log'),
-    'loglevel' : 'WARN',
-    'wqlog' : os.path.join(_path, 'workqueue.log'),
-    'queue_prefix' : 'yerba'
+    'log' : os.path.join(_path, 'yerba.log'),
+    'access' : os.path.join(_path, 'yerba.access.log'),
+    'level' : 'WARN',
+    'debug' : True
 }
 
-def main(args=None):
-    config = configparser.ConfigParser()
+config_paths = [
+    '/etc/yerba/yerba.cfg',
+    os.path.abspath(os.path.join(_path, '../yerba.cfg')),
+]
 
-    if args:
-        options = utils.ChainMap(args, _defaults)
-    else:
-        options = utils.ChainMap(_defaults)
+def main(args=None):
+    cfg = configparser.RawConfigParser(_defaults)
+
+    try:
+        config_paths.append(args['config'])
+    except KeyError:
+        pass
+    finally:
+        cfg.read(config_paths)
 
     # Setup Logging
-    if os.path.exists(options['logging']):
-        logging.config.fileConfig("logging.conf")
+    try:
+        logging_conf = cfg.get('yerba', 'logging')
+        logging.config.fileConfig(logging_conf)
         logger = logging.getLogger('yerba')
-    else:
+    except configparser.NoSectionError:
         logger = logging.getLogger('yerba')
-        logger.setLevel(options['loglevel'])
-
         format_string = ('%(asctime)s %(name)s:%(lineno)s'
             '[%(levelname)s] %(message)s')
 
         fmt = logging.Formatter(format_string, datefmt='%m/%d/%Y %I:%M:%S')
 
         filehandler = loghandlers.TimedRotatingFileHandler(
-                options['logfile'], 'midnight')
+                cfg.get('yerba', 'log'), 'midnight')
 
         filehandler.setLevel(logging.DEBUG)
         filehandler.setFormatter(fmt)
@@ -57,8 +63,8 @@ def main(args=None):
         logger.addHandler(streamhandler)
         logger.addHandler(bufferhandler)
 
-    logger.setLevel(getattr(logging, options['loglevel'].upper(), None))
-    yerba.listen_forever(port = options['port'], options = options)
+    logger.setLevel(getattr(logging, cfg.get('yerba', 'level').upper(), None))
+    yerba.listen_forever(cfg)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(

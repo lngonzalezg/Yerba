@@ -15,14 +15,12 @@ import core
 logger = logging.getLogger('yerba')
 running = True
 
-def listen_forever(port, options=None):
-    WorkQueueService.set_project(options['queue_prefix'])
-    wq = WorkQueueService()
+def listen_forever(config):
+    wq = WorkQueueService(dict(config.items('workqueue')))
     ServiceManager.register(wq)
     ServiceManager.start()
-    wq.workqueue_log(options['wqlog'])
 
-    connection_string = "tcp://*:{}".format(port)
+    connection_string = "tcp://*:{}".format(config.get('yerba', 'port'))
     context = zmq.Context()
     socket = context.socket(zmq.REP)
     socket.set(zmq.LINGER, 0)

@@ -1,10 +1,11 @@
 from __future__ import division
-import itertools
-import os
 import datetime
+import itertools
 import logging
+import sys
+import os
 
-from work_queue import (Task, WorkQueue, WORK_QUEUE_DEFAULT_PORT,
+from work_queue import (Task, WorkQueue, WORK_QUEUE_RANDOM_PORT,
                         WORK_QUEUE_INPUT, WORK_QUEUE_OUTPUT, set_debug_flag,
                         WORK_QUEUE_MASTER_MODE_CATALOG)
 import services
@@ -39,12 +40,21 @@ class WorkQueueService(services.Service):
     name = "workqueue"
     group = "scheduler"
 
-    @classmethod
-    def set_project(cls, project):
-        cls.project = project
+    def __init__(self, config):
+        self.tasks = {}
 
-    def workqueue_log(self, filename):
-        self.queue.specify_log(filename)
+        try:
+            self.project = config['project']
+            self.catalog_server = config['catalog_server']
+            self.catalog_port = int(config['catalog_port'])
+            self.port = int(config['port'])
+            self.log = config['log']
+
+            if config['debug']:
+                set_debug_flag('debug')
+        except KeyError:
+            logging.exception("Invalid workqueue configuration")
+            sys.exit(1)
 
     def initialize(self):
         '''
@@ -54,16 +64,17 @@ class WorkQueueService(services.Service):
         on the port. If an existing queue is running then an
         InitializeServiceException will be raised.
         '''
-        self.tasks = {}
-
         try:
-            set_debug_flag('debug')
-            self.queue = WorkQueue(name=self.project, catalog=True)
+            self.queue = WorkQueue(name=self.project, catalog=True, port=-1)
+            self.queue.specify_catalog_server(self.catalog_server,
+                    self.catalog_port)
+            self.queue.specify_log(self.log)
 
             logger.info('WORKQUEUE %s: Starting work queue on port %s',
                     self.project, self.queue.port)
         except Exception:
-            raise InitializeServiceException('Unable to start the work_queue')
+            logging.exception("The work queue could not be started")
+            sys.exit(1)
 
     def stop(self):
         '''
