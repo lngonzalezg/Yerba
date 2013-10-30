@@ -73,5 +73,6 @@ if __name__ == "__main__":
     parser.add_argument('--loglevel')
     parser.add_argument('--logging')
     parser.add_argument('--queue-prefix')
+    parser.add_argument('--config')
 
     main(args = {k:v for k, v in vars(parser.parse_args()).items() if v})
