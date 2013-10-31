@@ -47,6 +47,8 @@ def listen_forever(config):
             with utils.ignored(RouteNotFound):
                 response = dispatch(msg)
 
+            logger.info("#### END REQUEST ####")
+
             if not response:
                 logger.info("Invalid request: %s", msg)
                 response = {"status" : "error"}
@@ -62,12 +64,14 @@ def shutdown():
 @route("schedule")
 def schedule_workflow(data):
     '''Returns the job id'''
+    logger.info("##### WORKFLOW SCHEDULING #####")
     status = WorkflowManager.submit(data)
     return {"status" : core.status_name(status)}
 
 @route("cancel")
 def cancel_workflow(data):
     '''Cancels the job if it is running.'''
+    logger.info("##### WORKFLOW CANCELLATION #####")
     try:
         identity = data['id']
         status = WorkflowManager.cancel(identity)
@@ -79,6 +83,7 @@ def cancel_workflow(data):
 @route("get_status")
 def get_workflow_status(data):
     '''Gets the status of the workflow.'''
+    logger.info("##### WORKFLOW STATUS CHECK #####")
     try:
         identity = data['id']
         (status, jobs) = WorkflowManager.status(identity)

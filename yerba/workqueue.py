@@ -88,6 +88,7 @@ class WorkQueueService(services.Service):
         '''
         Schedules jobs into work_queue
         '''
+        logger.info("######### WORKQUEUE SCHEDULING ##########")
         for new_job in iterable:
             logger.info('WORKQUEUE %s: The workflow %s is scheduling job %s', self.project, name, new_job)
 
@@ -132,6 +133,8 @@ class WorkQueueService(services.Service):
 
             self.tasks[new_id] = ([name], new_job)
 
+        logger.info("######### WORKQUEUE END SCHEDULING ##########")
+
     def update(self):
         '''
         Updates the scheduled workflow.
@@ -143,6 +146,7 @@ class WorkQueueService(services.Service):
         if not task:
             return
 
+        logger.info("######### WORKQUEUE UPDATING ##########")
         logger.info("WORKQUEUE %s: Fetching task from the work queue",
                 self.project)
         logger.debug(('WORKQUEUE %s: Recieved task %s from work_queue with'
@@ -189,6 +193,8 @@ class WorkQueueService(services.Service):
 
         for (name, iterable) in items.items():
             self.schedule(iterable, name)
+
+        logger.info("######### END WORKQUEUE UPDATING ##########")
 
     def cancel(self, name):
         '''

@@ -225,6 +225,9 @@ class Workflow(object):
 
 def generate_workflow(pyobject):
     '''Generates a workflow from a python object.'''
+
+    logger.info("######### Generate Workflow  ##########")
+
     if 'name' not in pyobject or 'jobs' not in pyobject:
         raise WorkflowError("The workflow format was invalid.")
 
@@ -281,6 +284,7 @@ def generate_workflow(pyobject):
     else:
         workflow = Workflow(name, jobs, log=logfile)
 
+    logger.info("######### END Generate Workflow  ##########")
     return (identity, workflow)
 
 class JobError(ValueError):
