@@ -56,12 +56,8 @@ def main(args=None):
         streamhandler.setLevel(logging.DEBUG)
         streamhandler.setFormatter(fmt)
 
-        bufferhandler = loghandlers.MemoryHandler(1024, target=filehandler)
-        bufferhandler.setLevel(logging.DEBUG)
-        bufferhandler.setFormatter(fmt)
-
         logger.addHandler(streamhandler)
-        logger.addHandler(bufferhandler)
+        logger.addHandler(filehandler)
 
     logger.setLevel(getattr(logging, cfg.get('yerba', 'level').upper(), None))
     yerba.listen_forever(cfg)
