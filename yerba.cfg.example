@@ -1,5 +1,7 @@
 [DEFAULT]
 debug = False
+level=WARN
+log=/var/log/yerba/yerba.log
 
 [yerba]
 port = 1234
@@ -7,7 +9,7 @@ logging = /etc/yerba/logging.conf
 
 [workqueue]
 project = yerba
-log = /var/log/workqueue.log
+log = /var/log/yerba/workqueue.log
 port = -1
 catalog_server = localhost
 catalog_port = 1024
