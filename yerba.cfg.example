@@ -3,11 +3,11 @@ debug = False
 
 [yerba]
 port = 1234
-logging = '/etc/yerba/logging.conf'
+logging = /etc/yerba/logging.conf
 
 [workqueue]
 project = yerba
-log = "/var/log/workqueue.log"
+log = /var/log/workqueue.log
 port = -1
 catalog_server = localhost
 catalog_port = 1024
