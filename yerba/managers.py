@@ -102,8 +102,8 @@ def report_state():
     "--The work queue started on {}\n"
     "--The total time sending data to workers is {}\n"
     "--The total time spent recieving data from the workers is {}\n"
-    "--The total number of bytes sent is {}\n"
-    "--The total number of bytes recieved is {}\n"
+    "--The total number of MB sent is {}\n"
+    "--The total number of MB recieved is {}\n"
     "--The total number of workers joined {}\n"
     "--The total number of workers removed is {}\n"
     "--The total number of tasks completed is {}\n"
@@ -119,16 +119,18 @@ def report_state():
     "--There are {} workers full")
 
     dateformat="%d/%m/%y at %I:%M:%S%p"
-    DIV = 1000000.0
 
-    dt1 = datetime.datetime.fromtimestamp(stats.start_time/ DIV)
+    MICROSEC_PER_SECOND = 1000000.0
+    BYTES_PER_MEGABYTE = 1048576.0
+
+    dt1 = datetime.datetime.fromtimestamp(stats.start_time/ MICROSEC_PER_SECOND)
     start_time = dt1.strftime(dateformat)
 
     workqueue_status = msg.format(start_time,
         stats.total_send_time,
         stats.total_receive_time,
-        stats.total_bytes_sent,
-        stats.total_bytes_received,
+        stats.total_bytes_sent / BYTES_PER_MEGABYTE,
+        stats.total_bytes_received / BYTES_PER_MEGABYTE,
         stats.total_workers_joined,
         stats.total_workers_removed,
         stats.total_tasks_complete,
