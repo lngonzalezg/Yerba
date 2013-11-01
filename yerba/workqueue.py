@@ -219,7 +219,7 @@ class WorkQueueService(services.Service):
             if not names:
                 del self.tasks[taskid]
                 logger.info('WORKQUEUE %s: The task %s was cancelled',
-                    self.project, self.task.id)
+                    self.project, taskid)
                 self.queue.cancel_by_taskid(taskid)
             else:
                 msg = ('WORKQUEUE %s: The task %s was not cancelled '
