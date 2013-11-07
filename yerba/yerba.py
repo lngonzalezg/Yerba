@@ -1,5 +1,6 @@
 import argparse
 import atexit
+import json
 import logging
 import os
 import time
@@ -32,20 +33,23 @@ def listen_forever(config):
     while True:
         ServiceManager.update()
         if socket in dict(poller.poll(timeout=10)):
-            try:
-                msg = socket.recv_json(flags=zmq.NOBLOCK)
-            except Exception:
-                msg = None
-                logger.exception("The message was not parsed")
-
+            msg = None
             response = None
+
+            try:
+                data = socket.recv_string()
+                logger.debug("ZMQ: Recieved %s", data)
+                msg = decoder.decode(data)
+            except Exception:
+                logger.exception("ZMQ: The message was not parsed")
 
             if not msg:
                 logger.info("The message was not recieved.")
-                continue
-
-            with utils.ignored(RouteNotFound):
-                response = dispatch(msg)
+            else:
+                try:
+                    response = dispatch(msg)
+                except:
+                    logger.exception("EXCEPTION")
 
             logger.info("#### END REQUEST ####")
 
@@ -54,6 +58,7 @@ def listen_forever(config):
                 response = {"status" : "error"}
 
             try:
+                logger.info("Sending Response")
                 socket.send_json(response, flags=zmq.NOBLOCK)
             except zmq.Again:
                 logger.exception("Failed to respond with response %s",
