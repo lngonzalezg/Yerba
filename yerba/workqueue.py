@@ -149,8 +149,13 @@ class WorkQueueService(services.Service):
         logger.info("######### WORKQUEUE UPDATING ##########")
         logger.info("WORKQUEUE %s: Fetching task from the work queue",
                 self.project)
-        logger.debug(('WORKQUEUE %s: Recieved task %s from work_queue with'
-            ' return_status %s'), self.project, task.id, task.return_status)
+
+        try:
+            logger.debug("INSPECTING TASK: %s", str(task))
+            logger.debug(('WORKQUEUE %s: Recieved task %s from work_queue with'
+                ' return_status %s'), self.project, task.id, task.return_status)
+        except:
+            logger.debug("Couldn't inspect the task")
 
         if task.id not in self.tasks:
             logger.info(('WORKQUEUE %s: The job for id %s could ',
