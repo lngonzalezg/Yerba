@@ -63,6 +63,8 @@ def listen_forever(config):
             except zmq.Again:
                 logger.exception("Failed to respond with response %s",
                     response)
+            finally:
+                logger.info("Finished processing the response")
         else:
             try:
                 ServiceManager.update()
