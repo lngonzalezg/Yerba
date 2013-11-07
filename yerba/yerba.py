@@ -15,6 +15,7 @@ import core
 
 logger = logging.getLogger('yerba')
 running = True
+decoder = json.JSONDecoder()
 
 def listen_forever(config):
     wq = WorkQueueService(dict(config.items('workqueue')))
