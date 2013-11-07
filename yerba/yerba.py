@@ -31,7 +31,6 @@ def listen_forever(config):
     atexit.register(shutdown)
 
     while True:
-        ServiceManager.update()
         if socket in dict(poller.poll(timeout=10)):
             msg = None
             response = None
@@ -63,6 +62,11 @@ def listen_forever(config):
             except zmq.Again:
                 logger.exception("Failed to respond with response %s",
                     response)
+        else:
+            try:
+                ServiceManager.update()
+            except:
+                logger.exception("WORKQUEUE: Update error occured")
 def shutdown():
     ServiceManager.stop()
 
