@@ -174,8 +174,10 @@ class WorkflowHelper(object):
                         "Execution time: {elapsed} sec\n"
                         "Assigned to task: {taskid}\n"
                         "Return status: {returned}\n"
-                        "{output}")
+                        "Expected outputs: {outputs}\n"
+                        "Command Output:\n{output}")
                     fp.write('{0}\n'.format(job.description))
+                    job.info['outputs'] = ', '.join(job.outputs)
                     fp.write(msg.format(**job.info))
                 else:
                     fp.write('{0}\n'.format(job.description))
