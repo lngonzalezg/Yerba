@@ -11,10 +11,10 @@ def _format_args(args):
     argstring = ""
 
     for (arg, value, shorten) in args:
-        if shorten == 1:
-            val = os.path.basename(str(value))
-        else:
-            val = str(value)
+        val = str(value)
+
+        if shorten == 1 and os.path.isabs(val):
+            val = os.path.basename(val)
 
         argstring = ("%s %s %s" % (argstring, arg, val))
 
