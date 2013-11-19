@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import itertools
-
+import time
 
 import zmq
 
@@ -30,10 +30,16 @@ def main():
 
     result = None
 
-    while _defaults['max_attempts'] > count and not result:
+    while _defaults['max_attempts'] > counter.next() and not result:
+        time.sleep(1)
+
         if socket in dict(poller.poll(timeout=_defaults['timeout'])):
             result = socket.recv_json(flags=zmq.NOBLOCK)
-            count = counter.next()
+        else:
+            try:
+                socket.send_json(request, zmq.NOBLOCK)
+            except zmq.ZMQError:
+                pass
 
     if not result:
         print("Unable to connect to the job engine.")
