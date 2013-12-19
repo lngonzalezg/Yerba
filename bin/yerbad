@@ -9,6 +9,7 @@ import sys
 
 _path = os.path.dirname(__file__)
 sys.path.insert(0, os.path.abspath(os.path.join(_path, '..')))
+sys.path.insert(0, "/usr/local/lib/python2.7/site-packages")
 from yerba import (yerba, utils)
 
 _defaults = {

@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import time
+from time import sleep
 
 import zmq
 from managers import (ServiceManager, WorkflowManager)
@@ -32,44 +33,50 @@ def listen_forever(config):
     atexit.register(shutdown)
 
     while True:
-        if socket in dict(poller.poll(timeout=10)):
-            msg = None
-            response = None
+        try:
+            if socket in dict(poller.poll(timeout=10)):
+                msg = None
+                response = None
 
-            try:
-                data = socket.recv_string()
-                logger.debug("ZMQ: Recieved %s", data)
-                msg = decoder.decode(data)
-            except Exception:
-                logger.exception("ZMQ: The message was not parsed")
+                try:
+                    data = socket.recv_string()
+                    logger.debug("ZMQ: Recieved %s", data)
+                    msg = decoder.decode(data)
+                except Exception:
+                    logger.exception("ZMQ: The message was not parsed")
 
-            if not msg:
-                logger.info("The message was not recieved.")
+                if not msg:
+                    logger.info("The message was not recieved.")
+                else:
+                    try:
+                        response = dispatch(msg)
+                    except:
+                        logger.exception("EXCEPTION")
+
+                logger.info("#### END REQUEST ####")
+
+                if not response:
+                    logger.info("Invalid request: %s", msg)
+                    response = {"status" : "error"}
+
+                try:
+                    logger.info("Sending Response")
+                    socket.send_json(response, flags=zmq.NOBLOCK)
+                except zmq.Again:
+                    logger.exception("Failed to respond with response %s",
+                        response)
+                finally:
+                    logger.info("Finished processing the response")
             else:
                 try:
-                    response = dispatch(msg)
+                    ServiceManager.update()
                 except:
-                    logger.exception("EXCEPTION")
+                    logger.exception("WORKQUEUE: Update error occured")
+        except:
+            logger.exception("EXPERIENCED AN ERROR!")
 
-            logger.info("#### END REQUEST ####")
+        sleep(50.0/1000.0)
 
-            if not response:
-                logger.info("Invalid request: %s", msg)
-                response = {"status" : "error"}
-
-            try:
-                logger.info("Sending Response")
-                socket.send_json(response, flags=zmq.NOBLOCK)
-            except zmq.Again:
-                logger.exception("Failed to respond with response %s",
-                    response)
-            finally:
-                logger.info("Finished processing the response")
-        else:
-            try:
-                ServiceManager.update()
-            except:
-                logger.exception("WORKQUEUE: Update error occured")
 def shutdown():
     ServiceManager.stop()
 
