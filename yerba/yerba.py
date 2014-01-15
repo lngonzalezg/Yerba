@@ -80,6 +80,12 @@ def listen_forever(config):
 def shutdown():
     ServiceManager.stop()
 
+#XXX: Add reporting information
+@route("health")
+def get_health(data):
+    logger.info("#### HEALTH CHECK #####")
+    return  {"status" : "OK" }
+
 @route("schedule")
 def schedule_workflow(data):
     '''Returns the job id'''

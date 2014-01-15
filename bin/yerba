@@ -17,8 +17,8 @@ def main():
     socket.connect(_defaults['connection'])
 
     request = {
-        'request' : 'get_status',
-        'data' : { 'id' : 1 }
+        'request' : 'health',
+        'data' : { }
     }
 
     poller = zmq.Poller()
