@@ -2,6 +2,7 @@ from logging import getLogger
 from functools import wraps
 import datetime
 import time
+import os
 
 import core
 import utils
@@ -97,8 +98,14 @@ def report_state():
     if len(workflow_status) < 2:
         workflow_status.append("--No workflows found\n")
 
+    mem = utils.meminfo()
 
-    msg = ("---- Work Queue Info --\n"
+
+    msg = ("\n---- System Info---\n"
+    "--CPU LOAD: {} {} {}\n"
+    "--Total Memory Avaible {}\n"
+    "--Memory Free {}\n"
+    "---- Work Queue Info --\n"
     "--The work queue started on {}\n"
     "--The total time sending data to workers is {}\n"
     "--The total time spent recieving data from the workers is {}\n"
@@ -116,7 +123,7 @@ def report_state():
     "--There are {} workers initializing\n"
     "--There are {} workers ready\n"
     "--There are {} workers busy\n"
-    "--There are {} workers full")
+    "--There are {} workers full\n")
 
     dateformat="%d/%m/%y at %I:%M:%S%p"
 
@@ -126,7 +133,18 @@ def report_state():
     dt1 = datetime.datetime.fromtimestamp(stats.start_time/ MICROSEC_PER_SECOND)
     start_time = dt1.strftime(dateformat)
 
-    workqueue_status = msg.format(start_time,
+    try:
+        load1, load5, load15 = os.getloadavg()
+    except:
+        load1, load5, load15 = 0, 0, 0
+
+    workqueue_status = msg.format(
+        load1,
+        load5,
+        load15,
+        mem["MemTotal"],
+        mem["MemFree"],
+        start_time,
         stats.total_send_time,
         stats.total_receive_time,
         stats.total_bytes_sent / BYTES_PER_MEGABYTE,
@@ -143,7 +161,7 @@ def report_state():
         stats.workers_busy,
         stats.workers_full)
 
-    status = "".join(["".join(workflow_status), workqueue_status])
+    status = "".join([workqueue_status, "".join(workflow_status)])
     logger.debug(status)
     time.sleep(1)
 

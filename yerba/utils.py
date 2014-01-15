@@ -11,6 +11,11 @@ def ignored(*exceptions):
     except exceptions:
         pass
 
+def meminfo():
+    with open("/proc/meminfo") as fp:
+        return dict([[item.strip() for item in line.rstrip("\n").split(":")]
+            for line in fp])
+
 class ChainMap(UserDict.DictMixin):
     def __init__(self, *maps):
         self._maps = maps
