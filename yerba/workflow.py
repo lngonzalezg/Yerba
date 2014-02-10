@@ -21,7 +21,10 @@ def _format_args(args):
     return argstring
 
 class Job(object):
-    def __init__(self, cmd, script, arguments, retries=3, description=''):
+    def __init__(self, cmd, script, arguments, expected_return=0, retries=1,
+            description=''):
+
+        self.expected_return = expected_return
         self.cmd = cmd
         self.script = script
         self.args = arguments
@@ -63,15 +66,44 @@ class Job(object):
     def running(self):
         return self._status == 'running'
 
-    def completed(self):
+    def completed(self, returned=None):
         '''Returns whether or not the job was completed.'''
-        missing = [fp for fp in self.outputs if not os.path.isfile(fp)]
-        return not bool(missing)
+
+        # No outputs present
+        if not self.outputs:
+            if self.info:
+                return self.info['returned'] == self.expected_return
+            else:
+                return returned == self.expected_return
+
+        for fp in self.outputs:
+            if isinstance(fp, list) and fp[1]:
+                val = os.path.abspath(str(fp[0]))
+
+                if not os.path.isdir(val):
+                    return False
+            else:
+                val = os.path.abspath(str(fp))
+
+                if not os.path.isfile(val):
+                    return False
+        return True
 
     def ready(self):
         '''Returns that the job has its input files and is ready.'''
-        missing = [fp for fp in self.inputs if not os.path.isfile(fp)]
-        return not bool(missing)
+        for fp in self.inputs:
+            if isinstance(fp, list) and fp[1]:
+                val = os.path.abspath(str(fp[0]))
+
+                if not os.path.isdir(val):
+                    return False
+            else:
+                val = os.path.abspath(str(fp))
+
+                if not os.path.isfile(val):
+                    return False
+
+        return True
 
     def restart(self):
         self.retries = self.retries - 1
@@ -177,7 +209,17 @@ class WorkflowHelper(object):
                         "Expected outputs: {outputs}\n"
                         "Command Output:\n{output}")
                     fp.write('{0}\n'.format(job.description))
-                    job.info['outputs'] = ', '.join(job.outputs)
+
+                    outputs = []
+
+                    for item in job.outputs:
+                        if isinstance(item, list) and item[1]:
+                            outputs.append(item[0])
+                        else:
+                            outputs.append(item)
+
+                    job.info['outputs'] = ', '.join(outputs)
+
                     fp.write(msg.format(**job.info))
                 else:
                     fp.write('{0}\n'.format(job.description))
@@ -259,20 +301,18 @@ def generate_workflow(pyobject):
             raise JobError("WORKFLOW %s: The arguments are NoneType." % name)
 
         if 'inputs' in job and job['inputs']:
-            if any(fp is None for fp in job['inputs']):
+            if any(item is None for item  in job['inputs']):
                 msg = "WORKFLOW %s: The job has a NoneType input" % name
                 raise JobError(msg)
 
-            inputs = [os.path.abspath(str(item)) for item in job['inputs']]
-            new_job.inputs.extend(sorted(inputs))
+            new_job.inputs.extend(sorted(job['inputs']))
 
         if 'outputs' in job:
             if any(fp is None for fp in job['outputs']):
                 msg = "WORKFLOW %s: The job has a NoneType output" % name
                 raise JobError(msg)
 
-            outputs = [os.path.abspath(str(item)) for item in job['outputs']]
-            new_job.outputs.extend(sorted(outputs))
+            new_job.outputs.extend(sorted(job['outputs']))
 
         if 'overwrite' in job and int(job['overwrite']):
             logger.debug(("WORKFLOW %s: The job will overwrite previous"

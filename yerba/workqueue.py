@@ -118,14 +118,24 @@ class WorkQueueService(services.Service):
             task = Task(cmd)
 
             for input_file in new_job.inputs:
-                remote_input = os.path.basename(input_file)
-                task.specify_input_file(str(input_file), str(remote_input),
-                                       WORK_QUEUE_INPUT)
+                if isinstance(input_file, list) and input_file[1]:
+                    remote_input = os.path.basename(os.path.abspath(input_file[0]))
+                    task.specify_directory(str(input_file[0]), str(remote_input),
+                                    WORK_QUEUE_INPUT, recursive=1)
+                else:
+                    remote_input = os.path.basename(os.path.abspath(input_file))
+                    task.specify_input_file(str(input_file), str(remote_input),
+                                    WORK_QUEUE_INPUT)
 
             for output_file in new_job.outputs:
-                remote_output = os.path.basename(output_file)
-                task.specify_file(str(output_file), str(remote_output),
-                                  WORK_QUEUE_OUTPUT, cache=False)
+                if isinstance(output_file, list):
+                    remote_output = os.path.basename(os.path.abspath(output_file[0]))
+                    task.specify_directory(str(output_file[0]), str(remote_output),
+                                    WORK_QUEUE_OUTPUT, recursive=1, cache=False)
+                else:
+                    remote_output = os.path.basename(os.path.abspath(output_file))
+                    task.specify_file(str(output_file), str(remote_output),
+                                    WORK_QUEUE_OUTPUT, cache=False)
 
             new_id = self.queue.submit(task)
 
@@ -167,15 +177,18 @@ class WorkQueueService(services.Service):
 
         items = {}
 
-        if job.completed():
+        if job.completed(returned=task.return_status):
             for name in names:
                 fetch_message = ('WORKQUEUE %s: Fetching next jobs'
                         'in workflow %s')
                 logger.info(fetch_message, self.project, name)
+
+                #XXX: Need to update returned jobs first
+                managers.WorkflowManager.update(name, job, info)
+
                 iterable = managers.WorkflowManager.fetch(name)
                 if iterable:
                     items[name] = iterable
-                managers.WorkflowManager.update(name, job, info)
 
             del self.tasks[task.id]
 
