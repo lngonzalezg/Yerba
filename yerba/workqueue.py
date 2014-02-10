@@ -51,7 +51,7 @@ class WorkQueueService(services.Service):
             self.log = config['log']
 
             if config['debug']:
-                set_debug_flag('debug')
+                set_debug_flag('all')
         except KeyError:
             logging.exception("Invalid workqueue configuration")
             sys.exit(1)
