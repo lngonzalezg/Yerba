@@ -243,10 +243,7 @@ class WorkflowManager(object):
                 elif job.failed():
                     job.status = 'failed'
 
-                data.append({
-                    'status' : job.status,
-                    'description' : job.description,
-                })
+                data.append(job.state)
 
             status = workflow_helper.status()
 

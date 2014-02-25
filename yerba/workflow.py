@@ -21,19 +21,32 @@ def _format_args(args):
     return argstring
 
 class Job(object):
-    def __init__(self, cmd, script, arguments, expected_return=0, retries=1,
-            description=''):
-
-        self.expected_return = expected_return
+    def __init__(self, cmd, script, arguments, description=''):
         self.cmd = cmd
         self.script = script
         self.args = arguments
         self.inputs = []
         self.outputs = []
-        self.retries = retries
         self._status = 'waiting'
         self._description = description
         self._info = None
+        self._errors = []
+        self._options = {
+            "accepted-return-codes" : [ 0 ],
+            "allow-zero-length" : True,
+            "retries" : 0
+        }
+
+    @property
+    def options(self):
+        return self._options
+
+    @options.setter
+    def options(self, options):
+        """
+        Updates the options to be used by the job
+        """
+        self._options = utils.ChainMap(options, self._options)
 
     @property
     def status(self):
@@ -43,6 +56,14 @@ class Job(object):
     def status(self, value):
         logger.info('JOB: the status has been changed to %s', value)
         self._status = value
+
+    @property
+    def errors(self):
+        return self._errors
+
+    @errors.setter
+    def errors(self, error):
+        self._errors.append(error)
 
     @property
     def info(self):
@@ -58,6 +79,15 @@ class Job(object):
     def description(self):
         return self._description
 
+    @property
+    def state(self):
+        #FIXME add support for errors
+        return {
+            'status' : self.status,
+            'description' : self.description,
+            'errors' : self.errors
+        }
+
     def clear(self):
         for output in self.outputs:
             with utils.ignored(OSError):
@@ -68,13 +98,14 @@ class Job(object):
 
     def completed(self, returned=None):
         '''Returns whether or not the job was completed.'''
+        codes = self.options['accepted-return-codes']
 
         # No outputs present
         if not self.outputs:
             if self.info:
-                return self.info['returned'] == self.expected_return
-            else:
-                return returned == self.expected_return
+                returned = self.info['returned']
+
+            return any(returned == code for code in codes)
 
         for fp in self.outputs:
             if isinstance(fp, list) and fp[1]:
@@ -82,11 +113,17 @@ class Job(object):
 
                 if not os.path.isdir(val):
                     return False
-            else:
-                val = os.path.abspath(str(fp))
 
-                if not os.path.isfile(val):
+            elif self.options["allow-zero-length"]:
+                path = os.path.abspath(str(fp))
+
+                if not os.path.isfile(path):
                     return False
+            else:
+                path = os.path.abspath(str(fp))
+                if not os.path.isfile(path) or utils.is_empty(path):
+                    return False
+
         return True
 
     def ready(self):
@@ -97,19 +134,24 @@ class Job(object):
 
                 if not os.path.isdir(val):
                     return False
-            else:
-                val = os.path.abspath(str(fp))
+            elif self.options["allow-zero-length"]:
+                path = os.path.abspath(str(fp))
 
-                if not os.path.isfile(val):
+                if not os.path.isfile(path):
+                    return False
+            else:
+                path = os.path.abspath(str(fp))
+
+                if not os.path.isfile(path) or utils.is_empty(path):
                     return False
 
         return True
 
     def restart(self):
-        self.retries = self.retries - 1
+        self.options['retries'] = self.options['retries'] - 1
 
     def failed(self):
-        return self.retries <= 0
+        return self.options['retries'] < 0
 
     def __eq__(self, other):
         return (sorted(other.inputs) == sorted(self.inputs) and
@@ -267,6 +309,13 @@ class Workflow(object):
     def priority(self):
         return self._priority
 
+def get_options(options):
+    """
+        Return dictionary of options to be used by the job
+    """
+    return {key : value for (key, value) in options.iteritems()
+                if value is not None}
+
 def generate_workflow(pyobject):
     '''Generates a workflow from a python object.'''
 
@@ -299,6 +348,10 @@ def generate_workflow(pyobject):
             raise JobError("WORKFLOW %s: The command name is NoneType." % name)
         if not args:
             raise JobError("WORKFLOW %s: The arguments are NoneType." % name)
+
+        if 'options' in job:
+            logger.info("OPTION VALUES: %s", job['options'])
+            new_job.options = get_options(job['options'])
 
         if 'inputs' in job and job['inputs']:
             if any(item is None for item  in job['inputs']):
