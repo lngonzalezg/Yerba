@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import os
 import UserDict
 
 @contextmanager
@@ -36,3 +37,15 @@ class YerbaError(Exception):
         self._msg = msg
     def __str__(self):
         return repr(self._msg)
+
+def is_empty(path):
+    """
+    Return whether or not the file is empty
+
+    If the path is not a valid file an OSError
+    will be raised.
+    """
+    if not os.path.isfile(path):
+        raise OSError(2, "No such file", path)
+
+    return os.stat(path)[6] == 0
