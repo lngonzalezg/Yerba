@@ -28,6 +28,9 @@ class ChainMap(UserDict.DictMixin):
 
         raise KeyError(key)
 
+    def __setitem__(self, key, value):
+        self._maps[0][key] = value
+
 class YerbaError(Exception):
     def __init__(self, msg):
         self._msg = msg
