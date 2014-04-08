@@ -29,7 +29,7 @@ class Job(object):
         self.outputs = []
         self._status = 'waiting'
         self._description = description
-        self._info = None
+        self._info = {}
         self._errors = []
         self._options = {
             "accepted-return-codes" : [ 0 ],
@@ -82,11 +82,17 @@ class Job(object):
     @property
     def state(self):
         #FIXME add support for errors
-        return {
-            'status' : self.status,
-            'description' : self.description,
-            'errors' : self.errors
-        }
+
+        status = [
+            ['status', self.status],
+            ['description', self.description],
+            ['errors', self.errors]
+        ]
+
+        status.extend(self.info.items())
+
+        return dict(status)
+
 
     def clear(self):
         for output in self.outputs:
