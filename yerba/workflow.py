@@ -386,7 +386,7 @@ def generate_workflow(pyobject):
         workflow = Workflow(name, jobs, log=logfile)
 
     logger.info("######### END Generate Workflow  ##########")
-    return (identity, workflow)
+    return workflow
 
 class JobError(ValueError):
     pass

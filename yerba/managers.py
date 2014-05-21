@@ -6,6 +6,7 @@ import os
 
 import core
 import utils
+import db
 from workflow import generate_workflow, WorkflowHelper, WorkflowError, JobError
 
 logger = getLogger('yerba.manager')
@@ -87,10 +88,10 @@ def report_state():
     wq = ServiceManager.get("workqueue", "scheduler")
 
     workflow_status = ["INTERNAL STATE CHECK\n----WORKFLOW STATUS--\n"]
-    for (id, workflow) in WorkflowManager.workflows.items():
+    for (workflow_id, workflow) in WorkflowManager.workflows.items():
         helper = WorkflowHelper(workflow)
         msg = "--WORKFLOW (status = {0}): {1} ({2})\n"
-        workflow_status.append(msg.format(helper.status(), id, helper.message()))
+        workflow_status.append(msg.format(helper.status(), workflow_id, helper.message()))
 
 
     stats = wq.queue.stats
@@ -165,24 +166,46 @@ def report_state():
     logger.debug(status)
     time.sleep(1)
 
+
 class WorkflowManager(object):
+    database = db.Database()
     workflows = {}
 
     @classmethod
-    def submit(cls, json):
+    def connect(cls, filename):
+        '''Connect to workflow database'''
+        cls.database.connect(filename)
+
+    @classmethod
+    def submit(cls, workflow_object):
         '''Submits workflows to be scheduled'''
+
         try:
-            (id, workflow) = generate_workflow(json)
-            logger.debug("WORKFLOW %s: submitted with id %s", workflow.name, id)
+            workflow = generate_workflow(workflow_object)
+            logger.debug("WORKFLOW %s: submitted", workflow.name)
         except (JobError, WorkflowError):
             logger.exception("WORKFLOW: the workflow failed to be generated")
             return core.Status.Error
         except Exception:
-            logger.exception("WORKFLOW: An unexpected error occured during workflow generation")
+            logger.exception("""
+            WORKFLOW: An unexpected error occured during
+                    workflow generation""")
             return core.Status.Error
 
-        cls.workflows[id] = workflow
-        items = []
+        # Retrieve or save the workflow in the database
+        entry = db.find_workflow(cls.database, workflow_object)
+
+        if not entry:
+            db.add_workflow(cls.database, workflow_object)
+            entry = db.find_workflow(cls.database, workflow_object)
+
+        if entry:
+            workflow_id = str(entry[0])
+        else:
+            raise Exception("The workflow could not be added to the database")
+
+        cls.workflows[workflow_id] = workflow
+        items  = []
 
         for job in workflow.jobs:
             if job.completed():
@@ -194,9 +217,9 @@ class WorkflowManager(object):
                 job.status = 'scheduled'
 
         scheduler = ServiceManager.get("workqueue", "scheduler")
-        scheduler.schedule(items, id, priority=workflow.priority)
+        scheduler.schedule(items, workflow_id, priority=workflow.priority)
 
-        return core.Status.Scheduled
+        return (workflow_id, core.Status.Scheduled)
 
     @classmethod
     def fetch(cls, id):

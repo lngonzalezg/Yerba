@@ -22,6 +22,7 @@ def listen_forever(config):
     wq = WorkQueueService(dict(config.items('workqueue')))
     ServiceManager.register(wq)
     ServiceManager.start()
+    WorkflowManager.connect(config.get('db', 'path'))
 
     connection_string = "tcp://*:{}".format(config.get('yerba', 'port'))
     context = zmq.Context()
@@ -90,8 +91,8 @@ def get_health(data):
 def schedule_workflow(data):
     '''Returns the job id'''
     logger.info("##### WORKFLOW SCHEDULING #####")
-    status = WorkflowManager.submit(data)
-    return {"status" : core.status_name(status)}
+    (workflow_id, status) = WorkflowManager.submit(data)
+    return {"status" : core.status_name(status), "id": workflow_id}
 
 @route("cancel")
 def cancel_workflow(data):

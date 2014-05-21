@@ -11,6 +11,7 @@ _path = os.path.dirname(__file__)
 sys.path.insert(0, os.path.abspath(os.path.join(_path, '..')))
 sys.path.insert(0, "/usr/local/lib/python2.7/site-packages")
 from yerba import (yerba, utils)
+from yerba.db import setup
 
 _defaults = {
     'port' : 5151,
@@ -34,6 +35,13 @@ def main(args=None):
         pass
     finally:
         cfg.read(config_paths)
+
+    # Setup database and exit
+    if args.get('setup', False):
+        file_path = cfg.get('db', 'path')
+        index = cfg.get('db', 'start_index')
+        setup(file_path, index)
+        sys.exit(0)
 
     # Setup Logging
     try:
@@ -71,5 +79,6 @@ if __name__ == "__main__":
     parser.add_argument('--logging')
     parser.add_argument('--queue-prefix')
     parser.add_argument('--config')
+    parser.add_argument('--setup', action='store_true')
 
     main(args = {k:v for k, v in vars(parser.parse_args()).items() if v})
