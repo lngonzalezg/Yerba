@@ -241,40 +241,34 @@ class WorkflowManager(object):
     @classmethod
     def update(cls, workflow_id, job, info):
         '''Updates the job with details'''
+
         with utils.ignored(KeyError):
             workflow = cls.workflows[workflow_id]
             workflow_helper = WorkflowHelper(workflow)
             workflow_helper.add_job_info(job, info)
-            logger.info("WORKFLOW %s: updating the job %s",
-                    workflow.name, job)
 
-    @classmethod
-    def status(cls, workflow_id):
-        '''Gets the status of the current workflow.'''
-        status = core.Status.NotFound
-        data = []
-
-        with utils.ignored(KeyError):
-            workflow = cls.workflows[workflow_id]
-            workflow_helper = WorkflowHelper(workflow)
-            logger.debug("WORKFLOW %s: status check %s", workflow.name,
-                    workflow_helper.message())
-
-            for job in workflow_helper.workflow.jobs:
-                if job.status == 'running' and job.completed():
-                    job.status = 'completed'
-                elif job.failed():
-                    job.status = 'failed'
-
-                data.append(job.state)
+            if job.status == 'running' and job.completed():
+                job.status = 'completed'
+            elif job.failed():
+                job.status = 'failed'
 
             status = workflow_helper.status()
+            db.update_status(cls.database, workflow_id, status)
 
             if status != core.Status.Running:
                 workflow_helper.log()
                 cls.workflows[workflow_id]._logged = True
 
-        return (status, data)
+    @classmethod
+    def status(cls, workflow_id):
+        '''Gets the status of the current workflow.'''
+        status = db.get_status(cls.database, workflow_id)
+        jobs = []
+
+        with utils.ignored(KeyError):
+            jobs = [job.state for job in cls.workflows[workflow_id].jobs]
+
+        return (status, jobs)
 
     @classmethod
     def cancel(cls, workflow_id):
