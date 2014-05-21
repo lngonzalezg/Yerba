@@ -2,14 +2,12 @@ import argparse
 import atexit
 import json
 import logging
-import os
-import time
 from time import sleep
 
 import zmq
-from managers import (ServiceManager, WorkflowManager)
-from routes import (route, dispatch, RouteNotFound)
-from workqueue import WorkQueueService
+from .managers import (ServiceManager, WorkflowManager)
+from .routes import (route, dispatch)
+from .workqueue import WorkQueueService
 
 import utils
 import core

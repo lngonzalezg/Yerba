@@ -34,7 +34,7 @@ class ServiceManager(object):
         key = SEPERATOR.join((service.group, service.name))
 
         if key in cls.core:
-            logging.warn("This service already exists.")
+            logger.warn("This service already exists.")
         else:
             cls.core[key] = service
 
