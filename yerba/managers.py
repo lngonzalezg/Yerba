@@ -222,12 +222,12 @@ class WorkflowManager(object):
         return (workflow_id, core.Status.Scheduled)
 
     @classmethod
-    def fetch(cls, id):
+    def fetch(cls, workflow_id):
         '''Gets the next set of jobs to be run.'''
         iterable = []
 
         with utils.ignored(KeyError):
-            workflow = cls.workflows[id]
+            workflow = cls.workflows[workflow_id]
             workflow_helper = WorkflowHelper(workflow)
             iterable = workflow_helper.waiting()
 
@@ -239,23 +239,23 @@ class WorkflowManager(object):
         return iterable
 
     @classmethod
-    def update(cls, id, job, info):
+    def update(cls, workflow_id, job, info):
         '''Updates the job with details'''
         with utils.ignored(KeyError):
-            workflow = cls.workflows[id]
+            workflow = cls.workflows[workflow_id]
             workflow_helper = WorkflowHelper(workflow)
             workflow_helper.add_job_info(job, info)
             logger.info("WORKFLOW %s: updating the job %s",
                     workflow.name, job)
 
     @classmethod
-    def status(cls, id):
+    def status(cls, workflow_id):
         '''Gets the status of the current workflow.'''
         status = core.Status.NotFound
         data = []
 
         with utils.ignored(KeyError):
-            workflow = cls.workflows[id]
+            workflow = cls.workflows[workflow_id]
             workflow_helper = WorkflowHelper(workflow)
             logger.debug("WORKFLOW %s: status check %s", workflow.name,
                     workflow_helper.message())
@@ -272,22 +272,22 @@ class WorkflowManager(object):
 
             if status != core.Status.Running:
                 workflow_helper.log()
-                cls.workflows[id]._logged = True
+                cls.workflows[workflow_id]._logged = True
 
         return (status, data)
 
     @classmethod
-    def cancel(cls, id):
+    def cancel(cls, workflow_id):
         '''Cancel the workflow from being run.'''
         status = core.Status.NotFound
 
         with utils.ignored(KeyError):
-            workflow = cls.workflows[id]
+            workflow = cls.workflows[workflow_id]
             logger.info(('WORKQUEUE %s: the workflow has been requested'
             'to be cancelled'), workflow.name)
 
             scheduler = ServiceManager.get("workqueue", "scheduler")
-            scheduler.cancel(id)
+            scheduler.cancel(workflow_id)
 
             for job in workflow.jobs:
                 if job.status == 'waiting':
