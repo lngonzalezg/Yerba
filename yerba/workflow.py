@@ -231,7 +231,7 @@ class WorkflowHelper(object):
         return "".join(message).format(*jobs)
 
 
-    def log(self):
+    def log(self, filename):
         '''
         Logs the results of workflow.
         '''
@@ -240,7 +240,9 @@ class WorkflowHelper(object):
 
         self._workflow._logged = True
 
-        with open(self.workflow.log, 'a') as fp:
+        log_file = os.path.join(self.workflow.log, filename)
+
+        with open(log_file, 'a') as fp:
             for job in self._workflow.jobs:
                 fp.write('#' * 25 + '\n')
                 if job.status == 'skipped':
@@ -315,78 +317,74 @@ class Workflow(object):
     def priority(self):
         return self._priority
 
-def get_options(options):
+def filter_options(options):
     """
-        Return dictionary of options to be used by the job
+    Returns the set of filtered options that are specified
     """
     return {key : value for (key, value) in options.iteritems()
                 if value is not None}
 
 def generate_workflow(pyobject):
     '''Generates a workflow from a python object.'''
-
     logger.info("######### Generate Workflow  ##########")
+    job_objects = pyobject.get('jobs', [])
 
-    if 'name' not in pyobject or 'jobs' not in pyobject:
-        raise WorkflowError("The workflow format was invalid.")
-
-    if not len(pyobject['jobs']):
+    if not job_objects:
         raise WorkflowError("The workflow does not contain any jobs.")
 
-    identity = pyobject['id']
-    name = pyobject['name']
-    jobs = []
-    logfile = pyobject['logfile']
+    name = pyobject.get('name', 'unnamed')
+    level = pyobject.get('priority', 0)
+    logpath = pyobject.get('logpath', None)
+    jobs = [generate_job(job_object) for job_object in job_objects]
 
-    logger.info("WORKFLOW %s: Generating workflow [id %s]", name, identity)
-
-    for job in pyobject['jobs']:
-        (cmd, script, args) = (job['cmd'], job['script'], job['args'])
-
-        if 'description' in job:
-            new_job = Job(cmd, script, args, description=job['description'])
-        else:
-            new_job = Job(cmd, script, args)
-
-        logger.debug("WORKFLOW %s: Creating job %s", name, new_job.description)
-
-        if not cmd:
-            raise JobError("WORKFLOW %s: The command name is NoneType." % name)
-        if not args:
-            raise JobError("WORKFLOW %s: The arguments are NoneType." % name)
-
-        if 'options' in job:
-            logger.info("OPTION VALUES: %s", job['options'])
-            new_job.options = get_options(job['options'])
-
-        if 'inputs' in job and job['inputs']:
-            if any(item is None for item  in job['inputs']):
-                msg = "WORKFLOW %s: The job has a NoneType input" % name
-                raise JobError(msg)
-
-            new_job.inputs.extend(sorted(job['inputs']))
-
-        if 'outputs' in job:
-            if any(fp is None for fp in job['outputs']):
-                msg = "WORKFLOW %s: The job has a NoneType output" % name
-                raise JobError(msg)
-
-            new_job.outputs.extend(sorted(job['outputs']))
-
-        if 'overwrite' in job and int(job['overwrite']):
-            logger.debug(("WORKFLOW %s: The job will overwrite previous"
-                "results:\n%s"), name, new_job)
-            new_job.clear()
-
-        jobs.append(new_job)
-
-    if 'priority' in pyobject:
-        workflow = Workflow(name, jobs, log=logfile, priority=priority)
-    else:
-        workflow = Workflow(name, jobs, log=logfile)
-
+    workflow = Workflow(name, jobs, log=logpath, priority=level)
+    logger.info("WORKFLOW %s has been generated.", name)
     logger.info("######### END Generate Workflow  ##########")
+
     return workflow
+
+def generate_job(job_object):
+    """
+    Returns a job generated from a python object
+    """
+    (cmd, script, args) = (job_object['cmd'], job_object['script'], job_object['args'])
+
+    if not cmd:
+        raise JobError("The command name is NoneType.")
+
+    if not args:
+        raise JobError("The arguments are NoneType.")
+
+    # Set the job_object description
+    desc = job_object.get('description', '')
+    new_job = Job(cmd, script, args, description=desc)
+    logger.debug("Creating job %s",  new_job.description)
+
+    # Set the job_object options
+    options = job_object.get('options', {})
+    logger.info("Additional job options being set %s", options)
+    new_job.options = filter_options(options)
+
+    # Add inputs
+    inputs = job_object.get('inputs', []) or []
+    if any(item is None for item  in inputs):
+        raise JobError("The job has a NoneType input")
+
+    new_job.inputs.extend(sorted(inputs))
+
+    # Add outputs
+    outputs = job_object.get('outputs', []) or []
+    if any(fp is None for fp in outputs):
+        raise JobError("The job has a NoneType output")
+
+    new_job.outputs.extend(sorted(outputs))
+
+    if 'overwrite' in job_object and int(job_object['overwrite']):
+        logger.debug(("The job will overwrite previous"
+            "results:\n%s"), new_job)
+        new_job.clear()
+
+    return new_job
 
 class JobError(ValueError):
     pass

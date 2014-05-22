@@ -256,7 +256,7 @@ class WorkflowManager(object):
             db.update_status(cls.database, workflow_id, status)
 
             if status != core.Status.Running:
-                workflow_helper.log()
+                workflow_helper.log("job-%s" % workflow_id)
                 cls.workflows[workflow_id]._logged = True
 
     @classmethod
