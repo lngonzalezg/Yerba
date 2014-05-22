@@ -106,10 +106,15 @@ def add_workflow(database, workflow):
     params = (workflow_json, time(), None, Status.Scheduled)
     database.execute(INSERT_WORKFLOW_QUERY, params)
 
-def update_status(database, workflow_id, status):
+def update_status(database, workflow_id, status, completed=False):
     """
     Updates the status of the workflow
     """
     query = UPDATE_FIELD_QUERY.format(field="status")
     params = (status, workflow_id)
-    return database.execute(query, params)
+    database.execute(query, params)
+
+    if completed:
+        query = UPDATE_FIELD_QUERY.format(field="completed")
+        params = (time(), workflow_id)
+        database.execute(query, params)
