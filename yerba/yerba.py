@@ -104,6 +104,11 @@ def cancel_workflow(data):
     except KeyError:
         return {"status" : 'NotFound'}
 
+@route("workflows")
+def get_workflows(data):
+    '''Return all jobs'''
+    return { "workflows" : WorkflowManager.get_workflows() }
+
 @route("get_status")
 def get_workflow_status(data):
     '''Gets the status of the workflow.'''

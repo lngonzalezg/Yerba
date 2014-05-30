@@ -221,6 +221,12 @@ class WorkflowManager(object):
 
         return (workflow_id, core.Status.Scheduled)
 
+
+    @classmethod
+    def get_workflows(cls):
+        '''Gets the all the workflows in the job engine'''
+        return db.get_all_workflows(cls.database)
+
     @classmethod
     def fetch(cls, workflow_id):
         '''Gets the next set of jobs to be run.'''

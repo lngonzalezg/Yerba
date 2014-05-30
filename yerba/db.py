@@ -128,3 +128,10 @@ def update_status(database, workflow_id, status, completed=False):
         query = UPDATE_FIELD_QUERY.format(field="completed")
         params = (time(), workflow_id)
         database.execute(query, params)
+
+def get_all_workflows(database):
+    """
+    Returns all workflows in the database
+    """
+    cursor = database.execute(GET_WORKFLOWS_QUERY)
+    return cursor.fetchall()
