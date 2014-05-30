@@ -1,7 +1,7 @@
-import json
-import sqlite3
-
+from json import JSONEncoder
 from time import time
+from sqlite3 import connect, IntegrityError
+
 from .core import Status
 
 CREATE_TABLE_QUERY = '''
@@ -39,9 +39,18 @@ UPDATE_FIELD_QUERY = '''
     SET {field}=? WHERE id=?
 '''
 
-SERALIZE = json.JSONEncoder()
+GET_WORKFLOWS_QUERY = '''
+    SELECT id, submitted, completed, status
+    FROM workflows
+'''
+
+SERALIZE = JSONEncoder()
 
 class Database(object):
+    """
+    A minimal interface that abstract the sqlite api
+    """
+
     def __init__(self):
         self.handle = None
 
@@ -49,7 +58,7 @@ class Database(object):
         """
         Returns a connection to the database
         """
-        self.handle = sqlite3.connect(filename)
+        self.handle = connect(filename)
 
     def execute(self, query, params=()):
         """
@@ -59,7 +68,7 @@ class Database(object):
             with self.handle:
                 cursor = self.handle.execute(query, params)
             return cursor
-        except sqlite3.IntegrityError:
+        except IntegrityError:
             pass
 
     def close(self):
@@ -72,7 +81,7 @@ def setup(filename, start_index=0):
     """
     Creates the workflow table and reset the starting index
     """
-    database = sqlite3.connect(filename)
+    database = connect(filename)
     database.execute(CREATE_TABLE_QUERY)
     database.execute(START_INDEX_QUERY, (start_index,))
     database.close()
