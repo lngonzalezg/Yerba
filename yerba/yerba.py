@@ -74,7 +74,8 @@ def listen_forever(config):
         except:
             logger.exception("EXPERIENCED AN ERROR!")
 
-        sleep(50.0/1000.0)
+        # Sleep for 5 milliseconds
+        sleep(0.05)
 
 def shutdown():
     ServiceManager.stop()
@@ -106,8 +107,13 @@ def cancel_workflow(data):
 
 @route("workflows")
 def get_workflows(data):
-    '''Return all jobs'''
-    return { "workflows" : WorkflowManager.get_workflows() }
+    '''Return all matching workflows'''
+    ids = None
+
+    if data:
+        ids = data.get('ids', [])
+
+    return { "workflows" : WorkflowManager.get_workflows(ids) }
 
 @route("get_status")
 def get_workflow_status(data):

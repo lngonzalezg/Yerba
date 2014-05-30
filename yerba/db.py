@@ -44,7 +44,12 @@ GET_WORKFLOWS_QUERY = '''
     FROM workflows
 '''
 
-SERALIZE = JSONEncoder()
+GET_WORKFLOWS_IN_QUERY = '''
+    SELECT id, submitted, completed, status
+    FROM workflows WHERE id IN ({ids})
+'''
+
+encoder = JSONEncoder()
 
 class Database(object):
     """
@@ -103,7 +108,7 @@ def find_workflow(database, workflow):
     """
     Finds the workflow and returns its id
     """
-    workflow_json = SERALIZE.encode(workflow)
+    workflow_json = encoder.encode(workflow)
     cursor = database.execute(FIND_WORKFLOW_QUERY, (workflow_json,))
     return cursor.fetchone()
 
@@ -111,7 +116,7 @@ def add_workflow(database, workflow):
     """
     Adds the workflow and returns its id
     """
-    workflow_json = SERALIZE.encode(workflow)
+    workflow_json = encoder.encode(workflow)
     params = (workflow_json, time(), None, Status.Scheduled)
     cursor = database.execute(INSERT_WORKFLOW_QUERY, params)
     return str(cursor.lastrowid)
@@ -129,9 +134,17 @@ def update_status(database, workflow_id, status, completed=False):
         params = (time(), workflow_id)
         database.execute(query, params)
 
-def get_all_workflows(database):
+def get_workflows(database, ids=None):
     """
-    Returns all workflows in the database
+    Returns a subset of workflows
+
+    If ids is specified the workflows will be limited to the subset of
+    of workflows with matching ids.
     """
-    cursor = database.execute(GET_WORKFLOWS_QUERY)
+    if ids:
+        id_string = ",".join(set(str(workflow_id) for workflow_id in ids))
+        cursor = database.execute(GET_WORKFLOWS_IN_QUERY.format(ids=id_string))
+    else:
+        cursor = database.execute(GET_WORKFLOWS_QUERY)
+
     return cursor.fetchall()

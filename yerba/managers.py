@@ -207,13 +207,15 @@ class WorkflowManager(object):
         scheduler = ServiceManager.get("workqueue", "scheduler")
         scheduler.schedule(items, workflow.id, priority=workflow.priority)
 
+        logger.info("WORKFLOW ID: %s", workflow.id)
+
         return (workflow.id, core.Status.Scheduled)
 
 
     @classmethod
-    def get_workflows(cls):
+    def get_workflows(cls, ids):
         '''Gets the all the workflows in the job engine'''
-        return db.get_all_workflows(cls.database)
+        return db.get_workflows(cls.database, ids)
 
     @classmethod
     def fetch(cls, workflow_id):
