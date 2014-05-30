@@ -1,8 +1,10 @@
 import heapq
 import logging
 import os
+import re
 
 import core
+import db
 import utils
 from services import Service
 logger = logging.getLogger('yerba.workflow')
@@ -165,7 +167,7 @@ class Job(object):
                 str(other) == str(self))
 
     def __repr__(self):
-        return ' '.join([self.cmd, _format_args(self.args)])
+        return ' '.join([self.cmd, self.args])
 
     def __str__(self):
         return repr(self)
@@ -294,12 +296,17 @@ class WorkflowHelper(object):
         return status
 
 class Workflow(object):
-    def __init__(self, name, jobs, log=None, priority=0):
+    def __init__(self, workflow_id, name, jobs, log=None, priority=0):
+        self._id = workflow_id
         self._name = name
         self._log = log
         self._priority = priority
         self._jobs = jobs
         self._logged = False
+
+    @property
+    def id(self):
+        return self._id
 
     @property
     def jobs(self):
@@ -324,40 +331,97 @@ def filter_options(options):
     return {key : value for (key, value) in options.iteritems()
                 if value is not None}
 
-def generate_workflow(pyobject):
+def validate_job(job_object):
+    """
+    Returns if the job is valid or gives a reason why invalid.
+    """
+
+    cmd = job_object.get('cmd', None)
+    args = job_object.get('args', [])
+    inputs = job_object.get('inputs', []) or []
+    outputs = job_object.get('outputs', []) or []
+
+    if not cmd:
+        return (False, "The command name was not specified")
+
+    if args is None:
+        return (False, "The argument list was of type None")
+
+    if any(item is None for item  in inputs):
+        return (False, "The inputs specified are invalid")
+
+    if any(fp is None for fp in outputs):
+        return (False, "The outputs specified are invalid")
+
+    return (True, "The job was valid")
+
+
+def template(raw_string, template_parameters):
+    """
+    Returns a new string with templae parameters subsituted.
+
+    The input string is formatted by the template parameters passed
+    into the function
+    """
+
+    # convert the arguments into a string
+    result = raw_string
+
+    # substitute any template parameters
+    for (template, value) in template_parameters.items():
+        result = re.sub(template, value, result)
+
+    return result
+
+
+def generate_workflow(database, workflow_object):
     '''Generates a workflow from a python object.'''
     logger.info("######### Generate Workflow  ##########")
-    job_objects = pyobject.get('jobs', [])
+    job_objects = workflow_object.get('jobs', [])
 
     if not job_objects:
         raise WorkflowError("The workflow does not contain any jobs.")
 
-    name = pyobject.get('name', 'unnamed')
-    level = pyobject.get('priority', 0)
-    logpath = pyobject.get('logpath', None)
-    jobs = [generate_job(job_object) for job_object in job_objects]
+    name = workflow_object.get('name', 'unnamed')
+    level = workflow_object.get('priority', 0)
+    logpath = workflow_object.get('logpath', None)
 
-    workflow = Workflow(name, jobs, log=logpath, priority=level)
+    errors = []
+
+    # Verify jobs and save errors
+    for (index, job_object) in enumerate(job_objects):
+        (valid, reason) = validate_job(job_object)
+
+        if not valid:
+            errors.append((index, reason))
+
+    if errors:
+        raise WorkflowError("%s jobs where not valid." % len(errors), errors)
+
+    # Add verified workflow_object into the database
+    # The workflow_id is needed by individual jobs which use templates
+    workflow_id = db.add_workflow(database, workflow_object)
+
+    jobs = [generate_job(job_object, workflow_id) for job_object in job_objects]
+    workflow = Workflow(workflow_id, name, jobs, log=logpath, priority=level)
+
     logger.info("WORKFLOW %s has been generated.", name)
-    logger.info("######### END Generate Workflow  ##########")
-
     return workflow
 
-def generate_job(job_object):
+
+def generate_job(job_object, workflow_id):
     """
     Returns a job generated from a python object
     """
-    (cmd, script, args) = (job_object['cmd'], job_object['script'], job_object['args'])
+    (cmd, script, args) = (job_object['cmd'], job_object['script'],
+                           job_object.get('args', []))
 
-    if not cmd:
-        raise JobError("The command name is NoneType.")
-
-    if not args:
-        raise JobError("The arguments are NoneType.")
+    template_params = { "{WORKFLOW_ID}" : workflow_id }
+    arg_string = template(_format_args(args), template_params)
 
     # Set the job_object description
     desc = job_object.get('description', '')
-    new_job = Job(cmd, script, args, description=desc)
+    new_job = Job(cmd, script, arg_string, description=desc)
     logger.debug("Creating job %s",  new_job.description)
 
     # Set the job_object options
@@ -366,16 +430,28 @@ def generate_job(job_object):
     new_job.options = filter_options(options)
 
     # Add inputs
-    inputs = job_object.get('inputs', []) or []
-    if any(item is None for item  in inputs):
-        raise JobError("The job has a NoneType input")
+    raw_inputs = job_object.get('inputs', []) or []
+    inputs = []
+    for item in raw_inputs:
+        if isinstance(item, list):
+            (path, flag) = item
+            res = template(path, template_params)
+            inputs.append([res, flag])
+        else:
+            inputs.append(template(item, template_params))
 
     new_job.inputs.extend(sorted(inputs))
 
     # Add outputs
-    outputs = job_object.get('outputs', []) or []
-    if any(fp is None for fp in outputs):
-        raise JobError("The job has a NoneType output")
+    raw_outputs = job_object.get('outputs', []) or []
+    outputs = []
+    for item in raw_outputs:
+        if isinstance(item, list):
+            (path, flag) = item
+            res = template(path, template_params)
+            outputs.append([res, flag])
+        else:
+            outputs.append(template(item, template_params))
 
     new_job.outputs.extend(sorted(outputs))
 
@@ -386,8 +462,16 @@ def generate_job(job_object):
 
     return new_job
 
-class JobError(ValueError):
-    pass
 
 class WorkflowError(ValueError):
-    pass
+    def __init__(self, message, errors=None):
+        super(self, message)
+        self._errors = errors
+
+    @property
+    def errors(self):
+        """
+        Returns a list of invalid jobs
+        """
+        return self._errors
+

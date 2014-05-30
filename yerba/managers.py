@@ -7,7 +7,7 @@ import os
 import core
 import utils
 import db
-from workflow import generate_workflow, WorkflowHelper, WorkflowError, JobError
+from workflow import generate_workflow, WorkflowHelper, WorkflowError
 
 logger = getLogger('yerba.manager')
 SEPERATOR = '.'
@@ -181,9 +181,9 @@ class WorkflowManager(object):
         '''Submits workflows to be scheduled'''
 
         try:
-            workflow = generate_workflow(workflow_object)
+            workflow = generate_workflow(cls.database, workflow_object)
             logger.debug("WORKFLOW %s: submitted", workflow.name)
-        except (JobError, WorkflowError):
+        except ( WorkflowError):
             logger.exception("WORKFLOW: the workflow failed to be generated")
             return core.Status.Error
         except Exception:
@@ -192,19 +192,7 @@ class WorkflowManager(object):
                     workflow generation""")
             return core.Status.Error
 
-        # Retrieve or save the workflow in the database
-        entry = db.find_workflow(cls.database, workflow_object)
-
-        if not entry:
-            db.add_workflow(cls.database, workflow_object)
-            entry = db.find_workflow(cls.database, workflow_object)
-
-        if entry:
-            workflow_id = str(entry[0])
-        else:
-            raise Exception("The workflow could not be added to the database")
-
-        cls.workflows[workflow_id] = workflow
+        cls.workflows[workflow.id] = workflow
         items  = []
 
         for job in workflow.jobs:
@@ -217,9 +205,9 @@ class WorkflowManager(object):
                 job.status = 'scheduled'
 
         scheduler = ServiceManager.get("workqueue", "scheduler")
-        scheduler.schedule(items, workflow_id, priority=workflow.priority)
+        scheduler.schedule(items, workflow.id, priority=workflow.priority)
 
-        return (workflow_id, core.Status.Scheduled)
+        return (workflow.id, core.Status.Scheduled)
 
 
     @classmethod
