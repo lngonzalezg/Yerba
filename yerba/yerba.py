@@ -113,7 +113,14 @@ def get_workflows(data):
     if data:
         ids = data.get('ids', [])
 
-    return { "workflows" : WorkflowManager.get_workflows(ids) }
+    workflows = WorkflowManager.get_workflows(ids)
+    result = []
+
+    for (workflow_id, start, stop, status) in workflows:
+        status_message = core.status_name(status)
+        result.append((workflow_id, start, stop, status_message))
+
+    return { "workflows" : result }
 
 @route("get_status")
 def get_workflow_status(data):
