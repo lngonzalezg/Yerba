@@ -113,7 +113,8 @@ def add_workflow(database, workflow):
     """
     workflow_json = SERALIZE.encode(workflow)
     params = (workflow_json, time(), None, Status.Scheduled)
-    database.execute(INSERT_WORKFLOW_QUERY, params)
+    cursor = database.execute(INSERT_WORKFLOW_QUERY, params)
+    return str(cursor.lastrowid)
 
 def update_status(database, workflow_id, status, completed=False):
     """
