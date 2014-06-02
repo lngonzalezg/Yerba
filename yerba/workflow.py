@@ -1,6 +1,5 @@
 import logging
 import os
-import re
 
 from yerba import core
 from yerba import db
@@ -355,24 +354,6 @@ def validate_job(job_object):
     return (True, "The job was valid")
 
 
-def template(raw_string, template_parameters):
-    """
-    Returns a new string with templae parameters subsituted.
-
-    The input string is formatted by the template parameters passed
-    into the function
-    """
-
-    # convert the arguments into a string
-    result = raw_string
-
-    # substitute any template parameters
-    for (template, value) in template_parameters.items():
-        result = re.sub(template, value, result)
-
-    return result
-
-
 def generate_workflow(database, workflow_object):
     '''Generates a workflow from a python object.'''
     logger.info("######### Generate Workflow  ##########")
@@ -398,7 +379,6 @@ def generate_workflow(database, workflow_object):
         raise WorkflowError("%s jobs where not valid." % len(errors), errors)
 
     # Add verified workflow_object into the database
-    # The workflow_id is needed by individual jobs which use templates
     workflow_id = db.add_workflow(database, workflow_object)
 
     jobs = [generate_job(job_object, workflow_id) for job_object in job_objects]
@@ -415,8 +395,7 @@ def generate_job(job_object, workflow_id):
     (cmd, script, args) = (job_object['cmd'], job_object['script'],
                            job_object.get('args', []))
 
-    template_params = { "{WORKFLOW_ID}" : workflow_id }
-    arg_string = template(_format_args(args), template_params)
+    arg_string = _format_args(args)
 
     # Set the job_object description
     desc = job_object.get('description', '')
@@ -429,29 +408,11 @@ def generate_job(job_object, workflow_id):
     new_job.options = filter_options(options)
 
     # Add inputs
-    raw_inputs = job_object.get('inputs', []) or []
-    inputs = []
-    for item in raw_inputs:
-        if isinstance(item, list):
-            (path, flag) = item
-            res = template(path, template_params)
-            inputs.append([res, flag])
-        else:
-            inputs.append(template(item, template_params))
-
+    inputs = job_object.get('inputs', []) or []
     new_job.inputs.extend(sorted(inputs))
 
     # Add outputs
-    raw_outputs = job_object.get('outputs', []) or []
-    outputs = []
-    for item in raw_outputs:
-        if isinstance(item, list):
-            (path, flag) = item
-            res = template(path, template_params)
-            outputs.append([res, flag])
-        else:
-            outputs.append(template(item, template_params))
-
+    outputs = job_object.get('outputs', []) or []
     new_job.outputs.extend(sorted(outputs))
 
     if 'overwrite' in job_object and int(job_object['overwrite']):
