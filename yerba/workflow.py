@@ -1,12 +1,11 @@
-import heapq
 import logging
 import os
 import re
 
-import core
-import db
-import utils
-from services import Service
+from yerba import core
+from yerba import db
+from yerba import utils
+
 logger = logging.getLogger('yerba.workflow')
 
 def _format_args(args):

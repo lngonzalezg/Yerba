@@ -5,12 +5,10 @@ import logging
 from time import sleep
 
 import zmq
-from .managers import (ServiceManager, WorkflowManager)
-from .routes import (route, dispatch)
-from .workqueue import WorkQueueService
-
-import utils
-import core
+from yerba import core
+from yerba.managers import (ServiceManager, WorkflowManager)
+from yerba.routes import (route, dispatch)
+from yerba.workqueue import WorkQueueService
 
 logger = logging.getLogger('yerba')
 running = True

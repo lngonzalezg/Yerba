@@ -1,13 +1,13 @@
-from logging import getLogger
-from functools import wraps
+import cPickle
 import datetime
-import time
 import os
+import time
+from logging import getLogger
 
-import core
-import utils
-import db
-from workflow import generate_workflow, WorkflowHelper, WorkflowError
+from yerba import core
+from yerba import db
+from yerba.workflow import generate_workflow, WorkflowHelper, WorkflowError
+from yerba.utils import ignored, meminfo
 
 logger = getLogger('yerba.manager')
 SEPERATOR = '.'
@@ -44,7 +44,7 @@ class ServiceManager(object):
         key = SEPERATOR.join((service.group, service.name))
 
         if key in cls.core:
-            del core[key]
+            del cls.core[key]
 
     @classmethod
     def get(cls, name, group):
@@ -99,7 +99,7 @@ def report_state():
     if len(workflow_status) < 2:
         workflow_status.append("--No workflows found\n")
 
-    mem = utils.meminfo()
+    mem = meminfo()
 
 
     msg = ("\n---- System Info---\n"
@@ -222,7 +222,7 @@ class WorkflowManager(object):
         '''Gets the next set of jobs to be run.'''
         iterable = []
 
-        with utils.ignored(KeyError):
+        with ignored(KeyError):
             workflow = cls.workflows[workflow_id]
             workflow_helper = WorkflowHelper(workflow)
             iterable = workflow_helper.waiting()
@@ -238,7 +238,7 @@ class WorkflowManager(object):
     def update(cls, workflow_id, job, info):
         '''Updates the job with details'''
 
-        with utils.ignored(KeyError):
+        with ignored(KeyError):
             workflow = cls.workflows[workflow_id]
             workflow_helper = WorkflowHelper(workflow)
             workflow_helper.add_job_info(job, info)
@@ -264,7 +264,7 @@ class WorkflowManager(object):
         status = db.get_status(cls.database, workflow_id)
         jobs = []
 
-        with utils.ignored(KeyError):
+        with ignored(KeyError):
             jobs = [job.state for job in cls.workflows[workflow_id].jobs]
 
         return (status, jobs)
@@ -274,7 +274,7 @@ class WorkflowManager(object):
         '''Cancel the workflow from being run.'''
         status = core.Status.NotFound
 
-        with utils.ignored(KeyError):
+        with ignored(KeyError):
             workflow = cls.workflows[workflow_id]
             logger.info(('WORKQUEUE %s: the workflow has been requested'
             'to be cancelled'), workflow.name)

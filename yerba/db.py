@@ -1,8 +1,8 @@
 from json import JSONEncoder
-from time import time
 from sqlite3 import connect, IntegrityError
+from time import time
 
-from .core import Status
+from yerba.core import Status
 
 CREATE_TABLE_QUERY = '''
     CREATE TABLE IF NOT EXISTS workflows

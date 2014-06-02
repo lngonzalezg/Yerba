@@ -1,11 +1,11 @@
-import utils
+from yerba import utils
 
-_routes = {}
+ROUTES = {}
 
 def route(request):
     '''Returns the request as a new endpoint.'''
     def callback(func):
-        _routes[request] = func
+        ROUTES[request] = func
     return callback
 
 def dispatch(request):
@@ -13,7 +13,7 @@ def dispatch(request):
     with utils.ignored(KeyError):
         route = request['request']
         data = request['data']
-        return _routes[route](data)
+        return ROUTES[route](data)
 
     raise RouteNotFound("The request could not be routed.")
 

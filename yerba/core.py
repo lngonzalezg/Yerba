@@ -1,7 +1,4 @@
-from logging import getLogger
 from collections import namedtuple
-
-logger = getLogger('yerba.services')
 
 _status_types = [
     "NotFound",

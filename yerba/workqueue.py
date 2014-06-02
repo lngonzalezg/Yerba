@@ -1,28 +1,26 @@
 from __future__ import division
-import datetime
-import itertools
-import logging
-import sys
-import os
 
-from work_queue import (Task, WorkQueue, WORK_QUEUE_RANDOM_PORT,
-                        WORK_QUEUE_INPUT, WORK_QUEUE_OUTPUT, set_debug_flag,
-                        WORK_QUEUE_MASTER_MODE_CATALOG)
-import services
-import managers
+from datetime import datetime
+from logging import getLogger
+from os.path import abspath, basename
+from sys import exit
 
-logger = logging.getLogger('yerba.workqueue')
+import work_queue as wq
 
+from yerba.managers import WorkflowManager
+from yerba.services import Service
+
+logger = getLogger('yerba.workqueue')
 name = "yerba"
 
 def get_task_info(task):
     dateformat="%d/%m/%y at %I:%M:%S%p"
     DIV = 1000000.0
 
-    dt1 = datetime.datetime.fromtimestamp(task.submit_time / DIV)
+    dt1 = datetime.fromtimestamp(task.submit_time / DIV)
     start_time = dt1.strftime(dateformat)
 
-    dt2 = datetime.datetime.fromtimestamp(task.finish_time / DIV)
+    dt2 = datetime.fromtimestamp(task.finish_time / DIV)
     finish_time = dt2.strftime(dateformat)
     execution_time = task.cmd_execution_time / DIV
 
@@ -36,7 +34,7 @@ def get_task_info(task):
         'output' : task.output,
     }
 
-class WorkQueueService(services.Service):
+class WorkQueueService(Service):
     name = "workqueue"
     group = "scheduler"
 
@@ -51,10 +49,10 @@ class WorkQueueService(services.Service):
             self.log = config['log']
 
             if config['debug']:
-                set_debug_flag('all')
+                wq.set_debug_flag('all')
         except KeyError:
-            logging.exception("Invalid workqueue configuration")
-            sys.exit(1)
+            logger.exception("Invalid workqueue configuration")
+            exit(1)
 
     def initialize(self):
         '''
@@ -65,7 +63,7 @@ class WorkQueueService(services.Service):
         InitializeServiceException will be raised.
         '''
         try:
-            self.queue = WorkQueue(name=self.project, catalog=True, port=-1)
+            self.queue = wq.WorkQueue(name=self.project, catalog=True, port=-1)
             self.queue.specify_catalog_server(self.catalog_server,
                     self.catalog_port)
             self.queue.specify_log(self.log)
@@ -73,8 +71,8 @@ class WorkQueueService(services.Service):
             logger.info('WORKQUEUE %s: Starting work queue on port %s',
                     self.project, self.queue.port)
         except Exception:
-            logging.exception("The work queue could not be started")
-            sys.exit(1)
+            logger.exception("The work queue could not be started")
+            exit(1)
 
     def stop(self):
         '''
@@ -115,27 +113,27 @@ class WorkQueueService(services.Service):
                 continue
 
             cmd = str(new_job)
-            task = Task(cmd)
+            task = wq.Task(cmd)
 
             for input_file in new_job.inputs:
                 if isinstance(input_file, list) and input_file[1]:
-                    remote_input = os.path.basename(os.path.abspath(input_file[0]))
+                    remote_input = basename(abspath(input_file[0]))
                     task.specify_directory(str(input_file[0]), str(remote_input),
-                                    WORK_QUEUE_INPUT, recursive=1)
+                                    wq.WORK_QUEUE_INPUT, recursive=1)
                 else:
-                    remote_input = os.path.basename(os.path.abspath(input_file))
+                    remote_input = basename(abspath(input_file))
                     task.specify_input_file(str(input_file), str(remote_input),
-                                    WORK_QUEUE_INPUT)
+                                    wq.WORK_QUEUE_INPUT)
 
             for output_file in new_job.outputs:
                 if isinstance(output_file, list):
-                    remote_output = os.path.basename(os.path.abspath(output_file[0]))
+                    remote_output = basename(abspath(output_file[0]))
                     task.specify_directory(str(output_file[0]), str(remote_output),
-                                    WORK_QUEUE_OUTPUT, recursive=1, cache=False)
+                                    wq.WORK_QUEUE_OUTPUT, recursive=1, cache=False)
                 else:
-                    remote_output = os.path.basename(os.path.abspath(output_file))
+                    remote_output = basename(abspath(output_file))
                     task.specify_file(str(output_file), str(remote_output),
-                                    WORK_QUEUE_OUTPUT, cache=False)
+                                    wq.WORK_QUEUE_OUTPUT, cache=False)
 
             new_id = self.queue.submit(task)
 
@@ -179,33 +177,33 @@ class WorkQueueService(services.Service):
 
         if job.completed(returned=task.return_status):
             for name in names:
-                fetch_message = ('WORKQUEUE %s: Fetching next jobs'
+                fetch_message = ('WORKQUEUE %s: Fetching next jobs '
                         'in workflow %s')
                 logger.info(fetch_message, self.project, name)
 
                 #XXX: Need to update returned jobs first
-                managers.WorkflowManager.update(name, job, info)
+                WorkflowManager.update(name, job, info)
 
-                iterable = managers.WorkflowManager.fetch(name)
+                iterable = WorkflowManager.fetch(name)
                 if iterable:
                     items[name] = iterable
 
             del self.tasks[task.id]
 
         elif not job.failed():
-            logger.info(('WORKQUEUE %s: The task %s failed attempting'
+            logger.info(('WORKQUEUE %s: The task %s failed attempting '
                     'to rerun the task'), self.project, task.id)
             job.restart()
             for name in names:
                 items[name] = [job]
-                managers.WorkflowManager.update(name, job, info)
+                WorkflowManager.update(name, job, info)
 
             del self.tasks[task.id]
         else:
-            logger.info(('WORKQUEUE %s: The task %s failed notifying'
+            logger.info(('WORKQUEUE %s: The task %s failed notifying '
                 'workflows %s'), self.project, task.id, ', '.join(names))
             for name in names:
-                managers.WorkflowManager.update(name, job, info)
+                WorkflowManager.update(name, job, info)
 
             del self.tasks[task.id]
 
