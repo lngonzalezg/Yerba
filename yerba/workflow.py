@@ -262,53 +262,6 @@ class WorkflowHelper(object):
 
         return "".join(message).format(*jobs)
 
-
-    def log(self, filename):
-        '''
-        Logs the results of workflow.
-        '''
-        if self.workflow._logged or not self.workflow.log:
-            return
-
-        self._workflow._logged = True
-
-        log_file = os.path.join(self.workflow.log, filename)
-
-        with open(log_file, 'a') as fp:
-            for job in self._workflow.jobs:
-                fp.write('#' * 25 + '\n')
-                if job.status == 'skipped':
-                    fp.write('{0}\n'.format(job.description))
-                    fp.write("Job: %s\n" % str(job))
-                    fp.write("Skipped: The analysis was previously generated.\n")
-                elif job.info:
-                    msg = ("Job: {cmd}\n"
-                        "Submitted at: {started}\n"
-                        "Completed at: {ended}\n"
-                        "Execution time: {elapsed} sec\n"
-                        "Assigned to task: {taskid}\n"
-                        "Return status: {returned}\n"
-                        "Expected outputs: {outputs}\n"
-                        "Command Output:\n{output}")
-                    fp.write('{0}\n'.format(job.description))
-
-                    outputs = []
-
-                    for item in job.outputs:
-                        if isinstance(item, list) and item[1]:
-                            outputs.append(item[0])
-                        else:
-                            outputs.append(item)
-
-                    job.info['outputs'] = ', '.join(outputs)
-
-                    fp.write(msg.format(**job.info))
-                else:
-                    fp.write('{0}\n'.format(job.description))
-                    fp.write("Job: %s\n" % str(job))
-                    fp.write("The job was not run.\n")
-                fp.write('#' * 25 + '\n\n')
-
     def status(self):
         '''
         Return the status of the workflow

@@ -243,6 +243,9 @@ class WorkflowManager(object):
             workflow_helper = WorkflowHelper(workflow)
             workflow_helper.add_job_info(job, info)
 
+            if workflow.log:
+                log_job_info(workflow.log, job)
+
             if job.status == 'running' and job.completed():
                 job.status = 'completed'
             elif job.failed():
@@ -253,7 +256,6 @@ class WorkflowManager(object):
             if status != core.Status.Running:
                 db.update_status(cls.database, workflow_id, status,
                                  completed=True)
-                workflow_helper.log("job-%s" % workflow_id)
                 cls.workflows[workflow_id]._logged = True
             else:
                 db.update_status(cls.database, workflow_id, status)
