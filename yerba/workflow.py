@@ -20,6 +20,38 @@ def _format_args(args):
 
     return argstring
 
+
+def log_job_info(log_file, job):
+    '''Log the results of a job'''
+    outputs = []
+    msg = """
+        Job: {cmd}
+        Submitted at: {started}
+        Completed at: {ended}
+        Execution time: {elapsed} sec
+        Assigned to task: {taskid}
+        Return status: {returned}
+        Expected outputs: {outputs}
+        Command Output:
+        {output}\n
+    """
+
+    for item in job.outputs:
+        if isinstance(item, list) and item[1]:
+            outputs.append(item[0])
+        else:
+            outputs.append(item)
+
+    job.info['outputs'] = ', '.join(outputs)
+    description = '{0}\n'.format(job.description)
+    body = msg.format(**job.info)
+
+    with open(log_file, 'a') as log_handle:
+        log_handle.write('#' * 25 + '\n')
+        log_handle.write(description)
+        log_handle.write(body)
+        log_handle.write('#' * 25 + '\n\n')
+
 class Job(object):
     def __init__(self, cmd, script, arguments, description=''):
         self.cmd = cmd
