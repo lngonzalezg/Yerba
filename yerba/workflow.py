@@ -374,17 +374,22 @@ def validate_job(job_object):
     if not cmd:
         return (False, "The command name was not specified")
 
-    if args is None:
-        return (False, "The argument list was of type None")
+    if not isinstance(args, list):
+        return (False, "The job expected a list of arguments")
 
-    if any(item is None for item  in inputs):
-        return (False, "The inputs specified are invalid")
+    if not isinstance(inputs, list):
+        return (False, "The job expected a list of inputs")
+
+    if not isinstance(outputs, list):
+        return (False, "The job expected a list of outputs")
+
+    if any(item is None for item in inputs):
+        return (False, "An input was invalid")
 
     if any(fp is None for fp in outputs):
-        return (False, "The outputs specified are invalid")
+        return (False, "An output was invalid")
 
-    return (True, "The job was valid")
-
+    return (True, "The job has been validated")
 
 def generate_workflow(database, workflow_object):
     '''Generates a workflow from a python object.'''
