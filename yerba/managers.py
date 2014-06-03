@@ -4,7 +4,7 @@ import os
 import time
 from logging import getLogger
 
-from yerba import core
+from yerba.core import Status
 from yerba import db
 from yerba.workflow import generate_workflow, WorkflowHelper, WorkflowError
 from yerba.utils import ignored, meminfo
@@ -185,12 +185,12 @@ class WorkflowManager(object):
             logger.debug("WORKFLOW %s: submitted", workflow.name)
         except ( WorkflowError):
             logger.exception("WORKFLOW: the workflow failed to be generated")
-            return core.Status.Error
+            return Status.Error
         except Exception:
             logger.exception("""
             WORKFLOW: An unexpected error occured during
                     workflow generation""")
-            return core.Status.Error
+            return Status.Error
 
         cls.workflows[workflow.id] = workflow
         items  = []
@@ -209,7 +209,7 @@ class WorkflowManager(object):
 
         logger.info("WORKFLOW ID: %s", workflow.id)
 
-        return (workflow.id, core.Status.Scheduled)
+        return (workflow.id, Status.Scheduled)
 
 
     @classmethod
@@ -253,7 +253,7 @@ class WorkflowManager(object):
 
             status = workflow_helper.status()
 
-            if status != core.Status.Running:
+            if status != Status.Running:
                 db.update_status(cls.database, workflow_id, status,
                                  completed=True)
                 cls.workflows[workflow_id]._logged = True
@@ -274,7 +274,7 @@ class WorkflowManager(object):
     @classmethod
     def cancel(cls, workflow_id):
         '''Cancel the workflow from being run.'''
-        status = core.Status.NotFound
+        status = Status.NotFound
 
         with ignored(KeyError):
             workflow = cls.workflows[workflow_id]
@@ -292,6 +292,6 @@ class WorkflowManager(object):
                 elif job.status == 'scheduled':
                     job.status = 'cancelled'
 
-            status = core.Status.Cancelled
+            status = Status.Cancelled
 
         return status
