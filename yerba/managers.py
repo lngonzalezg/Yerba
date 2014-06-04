@@ -1,12 +1,12 @@
-import cPickle
-import datetime
-import os
-import time
+from datetime import datetime
 from logging import getLogger
+from os import getloadavg
+from time import time, sleep
 
 from yerba.core import Status
 from yerba import db
-from yerba.workflow import generate_workflow, WorkflowHelper, WorkflowError
+from yerba.workflow import (generate_workflow, log_job_info, WorkflowHelper,
+                            WorkflowError)
 from yerba.utils import ignored, meminfo
 
 logger = getLogger('yerba.manager')
@@ -61,7 +61,7 @@ class ServiceManager(object):
             service.initialize()
 
         cls.refresh = 300
-        cls.previous = time.time()
+        cls.previous = time()
         cls.RUNNING = True
 
     @classmethod
@@ -70,7 +70,7 @@ class ServiceManager(object):
         for service in cls.core.values():
             service.update()
 
-        current_time = time.time()
+        current_time = time()
         if (current_time - cls.previous) > cls.refresh:
             cls.previous = current_time
             report_state()
@@ -130,11 +130,11 @@ def report_state():
     MICROSEC_PER_SECOND = 1000000.0
     BYTES_PER_MEGABYTE = 1048576.0
 
-    dt1 = datetime.datetime.fromtimestamp(stats.start_time/ MICROSEC_PER_SECOND)
+    dt1 = datetime.fromtimestamp(stats.start_time/ MICROSEC_PER_SECOND)
     start_time = dt1.strftime(dateformat)
 
     try:
-        load1, load5, load15 = os.getloadavg()
+        load1, load5, load15 = getloadavg()
     except:
         load1, load5, load15 = 0, 0, 0
 
@@ -163,7 +163,7 @@ def report_state():
 
     status = "".join([workqueue_status, "".join(workflow_status)])
     logger.debug(status)
-    time.sleep(1)
+    sleep(1)
 
 
 class WorkflowManager(object):
