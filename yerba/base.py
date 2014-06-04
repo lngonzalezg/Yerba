@@ -5,9 +5,10 @@ import logging
 from time import sleep
 
 import zmq
-from yerba import core
+from yerba.core import status_message, status_name
 from yerba.managers import (ServiceManager, WorkflowManager)
 from yerba.routes import (route, dispatch)
+from yerba.workflow import WorkflowError
 from yerba.workqueue import WorkQueueService
 
 logger = logging.getLogger('yerba')
@@ -29,7 +30,7 @@ def listen_forever(config):
     poller.register(socket, zmq.POLLIN)
     atexit.register(shutdown)
 
-    while True:
+    while running:
         try:
             if socket in dict(poller.poll(timeout=10)):
                 msg = None
@@ -75,7 +76,11 @@ def listen_forever(config):
         # Sleep for 5 milliseconds
         sleep(0.05)
 
+
+@route("shutdown")
 def shutdown():
+    '''Shutdowns down the daemon'''
+    running = False
     ServiceManager.stop()
 
 #XXX: Add reporting information
@@ -88,8 +93,13 @@ def get_health(data):
 def schedule_workflow(data):
     '''Returns the job id'''
     logger.info("##### WORKFLOW SCHEDULING #####")
-    (workflow_id, status) = WorkflowManager.submit(data)
-    return {"status" : core.status_name(status), "id": workflow_id}
+    (workflow_id, status, errors) = WorkflowManager.submit(data)
+
+    return {
+        "status" : status_name(status),
+        "id": workflow_id,
+        "errors": errors
+    }
 
 @route("cancel")
 def cancel_workflow(data):
@@ -98,8 +108,8 @@ def cancel_workflow(data):
     try:
         identity = data['id']
         status = WorkflowManager.cancel(identity)
-        logger.info(core.status_message(identity, status))
-        return {"status" : core.status_name(status)}
+        logger.info(status_message(identity, status))
+        return {"status" : status_name(status)}
     except KeyError:
         return {"status" : 'NotFound'}
 
@@ -115,7 +125,7 @@ def get_workflows(data):
     result = []
 
     for (workflow_id, start, stop, status) in workflows:
-        status_message = core.status_name(status)
+        status_message = status_name(status)
         result.append((workflow_id, start, stop, status_message))
 
     return { "workflows" : result }
@@ -127,7 +137,7 @@ def get_workflow_status(data):
     try:
         identity = data['id']
         (status, jobs) = WorkflowManager.status(identity)
-        logger.info(core.status_message(identity, status))
-        return {"status" : core.status_name(status), "jobs" : jobs}
+        logger.info(status_message(identity, status))
+        return {"status" : status_name(status), "jobs" : jobs}
     except KeyError:
         return {"status" : 'NotFound', "jobs" : {}}
