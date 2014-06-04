@@ -279,17 +279,12 @@ class WorkflowHelper(object):
         return status
 
 class Workflow(object):
-    def __init__(self, workflow_id, name, jobs, log=None, priority=0):
-        self._id = workflow_id
+    def __init__(self, name, jobs, log=None, priority=0):
         self._name = name
         self._log = log
         self._priority = priority
         self._jobs = jobs
         self._logged = False
-
-    @property
-    def id(self):
-        return self._id
 
     @property
     def jobs(self):
@@ -344,7 +339,7 @@ def validate_job(job_object):
 
     return (True, "The job has been validated")
 
-def generate_workflow(database, workflow_object):
+def generate_workflow(workflow_object):
     '''Generates a workflow from a python object.'''
     logger.info("######### Generate Workflow  ##########")
     job_objects = workflow_object.get('jobs', [])
@@ -368,17 +363,12 @@ def generate_workflow(database, workflow_object):
     if errors:
         raise WorkflowError("%s jobs where not valid." % len(errors), errors)
 
-    # Add verified workflow_object into the database
-    workflow_id = db.add_workflow(database, workflow_object)
-
-    jobs = [generate_job(job_object, workflow_id) for job_object in job_objects]
-    workflow = Workflow(workflow_id, name, jobs, log=logpath, priority=level)
-
+    jobs = [generate_job(job_object) for job_object in job_objects]
+    workflow = Workflow(name, jobs, log=logpath, priority=level)
     logger.info("WORKFLOW %s has been generated.", name)
     return workflow
 
-
-def generate_job(job_object, workflow_id):
+def generate_job(job_object):
     """
     Returns a job generated from a python object
     """
