@@ -10,7 +10,6 @@ from yerba.workflow import generate_workflow, WorkflowHelper, WorkflowError
 from yerba.utils import ignored, meminfo
 
 logger = getLogger('yerba.manager')
-SEPERATOR = '.'
 
 class ServiceManager(object):
     core = {}
@@ -31,7 +30,7 @@ class ServiceManager(object):
             logger.error("Service does not belong to a group.")
             return
 
-        key = SEPERATOR.join((service.group, service.name))
+        key = '.'.join((service.group, service.name))
 
         if key in cls.core:
             logger.warn("This service already exists.")
@@ -41,14 +40,14 @@ class ServiceManager(object):
     @classmethod
     def deregister(cls, service):
         """Deregisters a service with the manager."""
-        key = SEPERATOR.join((service.group, service.name))
+        key = '.'.join((service.group, service.name))
 
         if key in cls.core:
             del cls.core[key]
 
     @classmethod
     def get(cls, name, group):
-        key = SEPERATOR.join((group, name))
+        key = '.'.join((group, name))
 
         if key in cls.core:
             return cls.core[key]
