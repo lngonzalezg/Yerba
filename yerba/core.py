@@ -1,33 +1,33 @@
 from collections import namedtuple
 
 _status_types = [
-    "NotFound",
-    "Waiting",
+    "Initialized",
+    "Scheduled",
     "Running",
     "Completed",
-    "Failed",
     "Cancelled",
-    "Terminated",
-    "Scheduled",
-    "Attached",
+    "Stopped",
+    "Failed",
+    "NotFound",
     "Error"
 ]
 
 def status_name(code):
     return _status_types[code]
 
-Status = namedtuple('Status', ' '.join(_status_types))._make(range(0, 10))
+indices = range(len(_status_types))
+Status = namedtuple('Status', ' '.join(_status_types))._make(indices)
 
 _status_messages = {
-    Status.Attached: "The workflow {0} is Attached",
+    Status.Initialized: "The workflow {0} has been initalized",
     Status.Scheduled: "The workflow {0} has been scheduled.",
+    Status.Running: "The workflow {0} is running.",
     Status.Completed: "The workflow {0} was completed.",
-    Status.Terminated: "The workflow {0} has been terminated.",
     Status.Cancelled: "The workflow {0} has been cancelled.",
+    Status.Stopped: "The workflow {0} has been stopped.",
     Status.Failed: "The workflow {0} failed.",
-    Status.Error: "The workflow {0} has errors.",
     Status.NotFound: "The workflow {0} was not found.",
-    Status.Running: "The workflow {0} is running."
+    Status.Error: "The workflow {0} has errors."
 }
 
 def status_message(name, code):
