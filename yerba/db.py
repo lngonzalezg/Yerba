@@ -104,11 +104,11 @@ def get_status(database, workflow_id):
     else:
         return Status.NotFound
 
-def find_workflow(database, workflow):
+def find_workflow(database, workflow_object):
     """
     Finds the workflow and returns its id
     """
-    workflow_json = encoder.encode(workflow)
+    workflow_json = encoder.encode(workflow['jobs'])
     cursor = database.execute(FIND_WORKFLOW_QUERY, (workflow_json,))
     return cursor.fetchone()
 
