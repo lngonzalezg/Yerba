@@ -126,6 +126,19 @@ def add_workflow(database, workflow_object=None, status=Status.Initialized):
     cursor = database.execute(INSERT_WORKFLOW_QUERY, params)
     return str(cursor.lastrowid)
 
+def get_workflow(database, workflow_id):
+    """
+    Returns the pickled workflow from the database
+    """
+
+    query = """
+        SELECT workflow
+        FROM workflows
+        WHERE workflow_id=?
+    """
+    cursor = database.execute(query, (workflow_id,))
+    return cursor.fetchone()
+
 def update_workflow(database, workflow_id, workflow):
     """
     Persists the pickled workflow into the database
