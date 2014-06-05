@@ -176,6 +176,15 @@ class WorkflowManager(object):
         cls.database.connect(filename)
 
     @classmethod
+    def create(cls, workflow_object=None):
+        '''Adds a new workflow to the database'''
+        status = Status.Initialized
+        workflow_id = db.add_workflow(cls.database, workflow=workflow_object,
+                               status=status)
+
+        logger.info("Generating new workflow")
+        return (workflow_id, status)
+
     def submit(cls, workflow_object):
         '''Submits workflows to be scheduled'''
 

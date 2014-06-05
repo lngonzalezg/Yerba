@@ -112,12 +112,17 @@ def find_workflow(database, workflow):
     cursor = database.execute(FIND_WORKFLOW_QUERY, (workflow_json,))
     return cursor.fetchone()
 
-def add_workflow(database, workflow):
+def add_workflow(database, workflow_object=None, status=Status.Initialized):
     """
     Adds the workflow and returns its id
     """
-    workflow_json = encoder.encode(workflow)
-    params = (workflow_json, time(), None, Status.Scheduled)
+
+    if workflow_object:
+        jobs = workflow_object['jobs']
+        params = (encoder.encode(jobs), time(), None, status)
+    else:
+        params = (None, time(), None, status)
+
     cursor = database.execute(INSERT_WORKFLOW_QUERY, params)
     return str(cursor.lastrowid)
 

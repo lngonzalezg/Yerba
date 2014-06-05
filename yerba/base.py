@@ -89,6 +89,12 @@ def get_health(data):
     logger.info("#### HEALTH CHECK #####")
     return  {"status" : "OK" }
 
+@route("new")
+def create_workflow(data):
+    '''Returns the id of a new workflow object'''
+    (workflow_id, status) = WorkflowManager.create()
+    return { "status": status_name(status), "id": workflow_id }
+
 @route("schedule")
 def schedule_workflow(data):
     '''Returns the job id'''
