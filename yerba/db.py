@@ -19,36 +19,6 @@ START_INDEX_QUERY = '''
     WHERE name='workflows'
 '''
 
-FIND_WORKFLOW_QUERY = '''
-    SELECT * FROM workflows
-    WHERE workflow=?
-'''
-
-GET_STATUS_QUERY = '''
-    SELECT status FROM workflows
-    WHERE id=?
-'''
-
-INSERT_WORKFLOW_QUERY = '''
-    INSERT INTO workflows(workflow, submitted, completed, status)
-    VALUES (?, ?, ?, ?)
-'''
-
-UPDATE_FIELD_QUERY = '''
-    UPDATE workflows
-    SET {field}=? WHERE id=?
-'''
-
-GET_WORKFLOWS_QUERY = '''
-    SELECT id, submitted, completed, status
-    FROM workflows
-'''
-
-GET_WORKFLOWS_IN_QUERY = '''
-    SELECT id, submitted, completed, status
-    FROM workflows WHERE id IN ({ids})
-'''
-
 encoder = JSONEncoder()
 
 class Database(object):
@@ -95,8 +65,12 @@ def get_status(database, workflow_id):
     """
     Returns the status of the workflow
     """
+    query = '''
+        SELECT status FROM workflows
+        WHERE id=?
+    '''
 
-    cursor = database.execute(GET_STATUS_QUERY, (workflow_id,))
+    cursor = database.execute(query, (workflow_id,))
     row = cursor.fetchone()
 
     if row:
@@ -104,18 +78,26 @@ def get_status(database, workflow_id):
     else:
         return Status.NotFound
 
-def find_workflow(database, workflow_object):
+def find_workflow(database, workflow):
     """
     Finds the workflow and returns its id
     """
+    query = '''
+        SELECT * FROM workflows
+        WHERE workflow=?
+    '''
     workflow_json = encoder.encode(workflow['jobs'])
-    cursor = database.execute(FIND_WORKFLOW_QUERY, (workflow_json,))
+    cursor = database.execute(query, (workflow_json,))
     return cursor.fetchone()
 
 def add_workflow(database, workflow_object=None, status=Status.Initialized):
     """
     Adds the workflow and returns its id
     """
+    query = '''
+        INSERT INTO workflows(workflow, submitted, completed, status)
+        VALUES (?, ?, ?, ?)
+    '''
 
     if workflow_object:
         jobs = workflow_object['jobs']
@@ -123,7 +105,7 @@ def add_workflow(database, workflow_object=None, status=Status.Initialized):
     else:
         params = (None, time(), None, status)
 
-    cursor = database.execute(INSERT_WORKFLOW_QUERY, params)
+    cursor = database.execute(query, params)
     return str(cursor.lastrowid)
 
 def get_workflow(database, workflow_id):
@@ -155,14 +137,21 @@ def update_status(database, workflow_id, status, completed=False):
     """
     Updates the status of the workflow
     """
-    query = UPDATE_FIELD_QUERY.format(field="status")
-    params = (status, workflow_id)
-    database.execute(query, params)
 
     if completed:
-        query = UPDATE_FIELD_QUERY.format(field="completed")
-        params = (time(), workflow_id)
-        database.execute(query, params)
+        query = '''
+            UPDATE workflows
+            SET status=?, completed=? WHERE id=?
+        '''
+        params = (status, time(), workflow_id)
+    else:
+        query = '''
+            UPDATE workflows
+            SET status=? WHERE id=?
+        '''
+        params = (status, workflow_id)
+
+    database.execute(query, params)
 
 def get_workflows(database, ids=None):
     """
@@ -171,10 +160,20 @@ def get_workflows(database, ids=None):
     If ids is specified the workflows will be limited to the subset of
     of workflows with matching ids.
     """
+
     if ids:
+        query = '''
+            SELECT id, submitted, completed, status
+            FROM workflows WHERE id IN ({ids})
+        '''
+
         id_string = ",".join(set(str(workflow_id) for workflow_id in ids))
-        cursor = database.execute(GET_WORKFLOWS_IN_QUERY.format(ids=id_string))
+        cursor = database.execute(query.format(ids=id_string))
     else:
-        cursor = database.execute(GET_WORKFLOWS_QUERY)
+        query = '''
+            SELECT id, submitted, completed, status
+            FROM workflows
+        '''
+        cursor = database.execute(query)
 
     return cursor.fetchall()
