@@ -59,8 +59,7 @@ class WorkQueueService(Service):
         Initializes work_queue for scheduling workers.
 
         A new work_queue will be created if an existing queue is not connected
-        on the port. If an existing queue is running then an
-        InitializeServiceException will be raised.
+        on the port. If an existing queue is running then the process will exit.
         '''
         try:
             self.queue = wq.WorkQueue(name=self.project, catalog=True, port=-1)

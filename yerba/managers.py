@@ -222,7 +222,7 @@ class WorkflowManager(object):
 
     @classmethod
     def get_workflows(cls, ids):
-        '''Gets the all the workflows in the job engine'''
+        '''Returns all matching workflows in the job engine'''
         return db.get_workflows(cls.database, ids)
 
     @classmethod

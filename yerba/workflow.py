@@ -23,18 +23,20 @@ def _format_args(args):
 
 def log_job_info(log_file, job):
     '''Log the results of a job'''
+    if not log_file or not os.path.isfile(log_file):
+        return
+
     outputs = []
-    msg = """
-        Job: {cmd}
-        Submitted at: {started}
-        Completed at: {ended}
-        Execution time: {elapsed} sec
-        Assigned to task: {taskid}
-        Return status: {returned}
-        Expected outputs: {outputs}
-        Command Output:
-        {output}\n
-    """
+    msg = (
+        "Job: {cmd}\n"
+        "Submitted at: {started}\n"
+        "Completed at: {ended}\n"
+        "Execution time: {elapsed} sec\n"
+        "Assigned to task: {taskid}\n"
+        "Return status: {returned}\n"
+        "Expected outputs: {outputs}\n"
+        "Command Output:\n"
+        "{output}")
 
     for item in job.outputs:
         if isinstance(item, list) and item[1]:
@@ -50,6 +52,30 @@ def log_job_info(log_file, job):
         log_handle.write('#' * 25 + '\n')
         log_handle.write(description)
         log_handle.write(body)
+        log_handle.write('#' * 25 + '\n\n')
+
+def log_skipped_job(log_file, job):
+    '''Log a job that was skipped'''
+    if not log_file or not os.path.isfile(log_file):
+        return
+
+    with open(log_file, 'a') as log_handle:
+        log_handle.write('#' * 25 + '\n')
+        log_handle.write('{0}\n'.format(job.description))
+        log_handle.write("Job: %s\n" % str(job))
+        log_handle.write("Skipped: The analysis was previously generated.\n")
+        log_handle.write('#' * 25 + '\n\n')
+
+def log_not_run_job(log_file, job):
+    '''Log a job that could not be run'''
+    if not log_file or not os.path.isfile(log_file):
+        return
+
+    with open(log_file, 'a') as log_handle:
+        log_handle.write('#' * 25 + '\n')
+        log_handle.write('{0}\n'.format(job.description))
+        log_handle.write("Job: %s\n" % str(job))
+        log_handle.write("The job was not run.\n")
         log_handle.write('#' * 25 + '\n\n')
 
 class Job(object):
@@ -349,7 +375,7 @@ def generate_workflow(workflow_object):
 
     name = workflow_object.get('name', 'unnamed')
     level = workflow_object.get('priority', 0)
-    logpath = workflow_object.get('logpath', None)
+    logfile = workflow_object.get('logfile', None)
 
     errors = []
 
@@ -364,7 +390,7 @@ def generate_workflow(workflow_object):
         raise WorkflowError("%s jobs where not valid." % len(errors), errors)
 
     jobs = [generate_job(job_object) for job_object in job_objects]
-    workflow = Workflow(name, jobs, log=logpath, priority=level)
+    workflow = Workflow(name, jobs, log=logfile, priority=level)
     logger.info("WORKFLOW %s has been generated.", name)
     return workflow
 

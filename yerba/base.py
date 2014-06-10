@@ -1,4 +1,3 @@
-import argparse
 import atexit
 import json
 import logging

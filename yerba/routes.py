@@ -11,9 +11,9 @@ def route(request):
 def dispatch(request):
     '''Dispatches request to given route'''
     with utils.ignored(KeyError):
-        route = request['request']
+        endpoint = request['request']
         data = request['data']
-        return ROUTES[route](data)
+        return ROUTES[endpoint](data)
 
     raise RouteNotFound("The request could not be routed.")
 
