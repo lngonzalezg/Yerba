@@ -4,9 +4,9 @@ from os import getloadavg
 from time import time, sleep
 
 from yerba.core import Status
-from yerba import db
-from yerba.workflow import (generate_workflow, log_job_info, WorkflowHelper,
-                            WorkflowError)
+from yerba.db import Database, WorkflowStore
+from yerba.workflow import (generate_workflow, WorkflowHelper, WorkflowError,
+                            log_not_run_job, log_job_info, log_skipped_job)
 from yerba.utils import ignored, meminfo
 
 logger = getLogger('yerba.manager')
@@ -167,45 +167,85 @@ def report_state():
 
 
 class WorkflowManager(object):
-    database = db.Database()
+    database = Database()
+    store = None
     workflows = {}
 
     @classmethod
     def connect(cls, filename):
         '''Connect to workflow database'''
         cls.database.connect(filename)
+        cls.store = WorkflowStore(cls.database)
 
     @classmethod
-    def create(cls, workflow_object=None):
+    def create(cls, workflow=None, jobs_object=None, status=Status.Initialized):
         '''Adds a new workflow to the database'''
-        status = Status.Initialized
-        workflow_id = db.add_workflow(cls.database, workflow=workflow_object,
-                               status=status)
+
+        if workflow and jobs_object:
+            workflow_id = cls.store.add_workflow(
+                name=workflow.name, log=workflow.log, jobs=jobs_object,
+                status=status, priority=workflow.priority)
+        else:
+            workflow_id = cls.store.add_workflow(status=status)
 
         logger.info("Generating new workflow")
         return (workflow_id, status)
 
-    def submit(cls, workflow_object):
-        '''Submits workflows to be scheduled'''
+    @classmethod
+    def submit(cls, data):
+        '''Generate and schedule the workflow to be run'''
+        workflow_id = data.get('id', None)
 
         try:
-            workflow = generate_workflow(cls.database, workflow_object)
+            workflow = generate_workflow(data)
             logger.debug("WORKFLOW %s: submitted", workflow.name)
-        except ( WorkflowError):
+        except WorkflowError:
             logger.exception("WORKFLOW: the workflow failed to be generated")
-            return Status.Error
         except Exception:
-            logger.exception("""
-            WORKFLOW: An unexpected error occured during
-                    workflow generation""")
-            return Status.Error
+            logger.exception("""WORKFLOW: An unexpected error occured during
+                            workflow generation""")
+            return (None, Status.Error, None)
 
-        cls.workflows[workflow.id] = workflow
+        # Check if the id was given otherwise try to find the workflow
+        # Create a new entry if the workflow was not found
+        # This allows a workflow to be unique and reusable
+        if workflow_id:
+            workflow_found = cls.store.get_workflow(workflow_id)
+        else:
+            workflow_found = cls.store.find_workflow(data['jobs'])
+
+        if workflow_found:
+            (workflow_id, _, _, _, _, _, _, status) = workflow_found
+
+            if workflow_id in cls.workflows and status == Status.Running:
+                return (workflow_id, status, None)
+
+            if status == Status.Initialized:
+                logger.info("Updating existing workflow")
+                cls.store.update_workflow(workflow_id,
+                    name=workflow.name, log=workflow.log, jobs=data['jobs'],
+                    priority=workflow.priority)
+        else:
+
+            (workflow_id, _) = cls.create(workflow=workflow,
+                                          jobs_object=data['jobs'])
+
+        cls.workflows[workflow_id] = workflow
+        scheduled_status = cls.schedule(workflow_id, workflow)
+
+        return (workflow_id, scheduled_status, None)
+
+    @classmethod
+    def schedule(cls, workflow_id, workflow):
+        '''Schedules a workflow by its id'''
+        status = Status.Scheduled
         items  = []
+        cls.store.update_status(workflow_id, status)
 
         for job in workflow.jobs:
             if job.completed():
                 job.status = 'skipped'
+                log_skipped_job(workflow.log, job)
             elif job.ready():
                 job.status = 'running'
                 items.append(job)
@@ -213,17 +253,15 @@ class WorkflowManager(object):
                 job.status = 'scheduled'
 
         scheduler = ServiceManager.get("workqueue", "scheduler")
-        scheduler.schedule(items, workflow.id, priority=workflow.priority)
+        scheduler.schedule(items, workflow_id, priority=workflow.priority)
+        logger.info("WORKFLOW ID: %s", workflow_id)
 
-        logger.info("WORKFLOW ID: %s", workflow.id)
-
-        return (workflow.id, Status.Scheduled)
-
+        return status
 
     @classmethod
     def get_workflows(cls, ids):
         '''Returns all matching workflows in the job engine'''
-        return db.get_workflows(cls.database, ids)
+        return cls.store.fetch(ids)
 
     @classmethod
     def fetch(cls, workflow_id):
@@ -261,21 +299,26 @@ class WorkflowManager(object):
 
             status = workflow_helper.status()
 
+            if status == Status.Failed:
+                for job in workflow.jobs:
+                    if job.status == 'scheduled':
+                        log_not_run_job(workflow.log, job)
+
             if status != Status.Running:
-                db.update_status(cls.database, workflow_id, status,
+                cls.store.update_status(workflow_id, status,
                                  completed=True)
                 cls.workflows[workflow_id]._logged = True
             else:
-                db.update_status(cls.database, workflow_id, status)
+                cls.store.update_status(workflow_id, status)
 
     @classmethod
     def status(cls, workflow_id):
         '''Gets the status of the current workflow.'''
-        status = db.get_status(cls.database, workflow_id)
+        status = cls.store.get_status(workflow_id)
         jobs = []
 
         with ignored(KeyError):
-            jobs = [job.state for job in cls.workflows[workflow_id].jobs]
+            jobs = [job.state for job in cls.workflows[int(workflow_id)].jobs]
 
         return (status, jobs)
 
@@ -285,9 +328,11 @@ class WorkflowManager(object):
         status = Status.NotFound
 
         with ignored(KeyError):
-            workflow = cls.workflows[workflow_id]
+            workflow = cls.workflows[int(workflow_id)]
             logger.info(('WORKQUEUE %s: the workflow has been requested'
             'to be cancelled'), workflow.name)
+
+            cls.store.update_status(workflow_id, Status.Cancelled)
 
             scheduler = ServiceManager.get("workqueue", "scheduler")
             scheduler.cancel(workflow_id)

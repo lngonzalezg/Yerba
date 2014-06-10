@@ -129,9 +129,9 @@ def get_workflows(data):
     workflows = WorkflowManager.get_workflows(ids)
     result = []
 
-    for (workflow_id, start, stop, status) in workflows:
+    for (workflow_id, name, start, stop, status, priority) in workflows:
         status_message = status_name(status)
-        result.append((workflow_id, start, stop, status_message))
+        result.append((workflow_id, name, start, stop, status_message))
 
     return { "workflows" : result }
 

@@ -7,9 +7,12 @@ from yerba.core import Status
 CREATE_TABLE_QUERY = '''
     CREATE TABLE IF NOT EXISTS workflows
     (id INTEGER PRIMARY KEY AUTOINCREMENT,
-     workflow BLOB,
+     name TEXT,
+     log TEXT,
+     jobs BLOB,
      submitted TEXT,
      completed TEXT,
+     priority INTEGER,
      status INTEGER)
 '''
 
@@ -52,6 +55,7 @@ class Database(object):
         """
         self.handle.close()
 
+
 def setup(filename, start_index=0):
     """
     Creates the workflow table and reset the starting index
@@ -61,119 +65,132 @@ def setup(filename, start_index=0):
     database.execute(START_INDEX_QUERY, (start_index,))
     database.close()
 
-def get_status(database, workflow_id):
-    """
-    Returns the status of the workflow
-    """
-    query = '''
-        SELECT status FROM workflows
-        WHERE id=?
-    '''
+class WorkflowStore(object):
+    def __init__(self, database):
+        self.database = database
 
-    cursor = database.execute(query, (workflow_id,))
-    row = cursor.fetchone()
-
-    if row:
-        return row[0]
-    else:
-        return Status.NotFound
-
-def find_workflow(database, workflow):
-    """
-    Finds the workflow and returns its id
-    """
-    query = '''
-        SELECT * FROM workflows
-        WHERE workflow=?
-    '''
-    workflow_json = encoder.encode(workflow['jobs'])
-    cursor = database.execute(query, (workflow_json,))
-    return cursor.fetchone()
-
-def add_workflow(database, workflow_object=None, status=Status.Initialized):
-    """
-    Adds the workflow and returns its id
-    """
-    query = '''
-        INSERT INTO workflows(workflow, submitted, completed, status)
-        VALUES (?, ?, ?, ?)
-    '''
-
-    if workflow_object:
-        jobs = workflow_object['jobs']
-        params = (encoder.encode(jobs), time(), None, status)
-    else:
-        params = (None, time(), None, status)
-
-    cursor = database.execute(query, params)
-    return str(cursor.lastrowid)
-
-def get_workflow(database, workflow_id):
-    """
-    Returns the pickled workflow from the database
-    """
-
-    query = """
-        SELECT workflow
-        FROM workflows
-        WHERE workflow_id=?
-    """
-    cursor = database.execute(query, (workflow_id,))
-    return cursor.fetchone()
-
-def update_workflow(database, workflow_id, workflow):
-    """
-    Persists the pickled workflow into the database
-    """
-    query = """
-        UPDATE workflows
-        SET workflow=?
-        WHERE id=?
-    """
-    params = (workflow, workflow_id)
-    database.execute(query, params)
-
-def update_status(database, workflow_id, status, completed=False):
-    """
-    Updates the status of the workflow
-    """
-
-    if completed:
+    def get_status(self, workflow_id):
+        """
+        Returns the status of the workflow
+        """
         query = '''
-            UPDATE workflows
-            SET status=?, completed=? WHERE id=?
-        '''
-        params = (status, time(), workflow_id)
-    else:
-        query = '''
-            UPDATE workflows
-            SET status=? WHERE id=?
-        '''
-        params = (status, workflow_id)
-
-    database.execute(query, params)
-
-def get_workflows(database, ids=None):
-    """
-    Returns a subset of workflows
-
-    If ids is specified the workflows will be limited to the subset of
-    of workflows with matching ids.
-    """
-
-    if ids:
-        query = '''
-            SELECT id, submitted, completed, status
-            FROM workflows WHERE id IN ({ids})
+            SELECT status FROM workflows
+            WHERE id=?
         '''
 
-        id_string = ",".join(set(str(workflow_id) for workflow_id in ids))
-        cursor = database.execute(query.format(ids=id_string))
-    else:
+        cursor = self.database.execute(query, (workflow_id,))
+        row = cursor.fetchone()
+
+        if row:
+            return row[0]
+        else:
+            return Status.NotFound
+
+    def find_workflow(self, jobs):
+        """
+        Finds the workflow and returns its id
+        """
         query = '''
-            SELECT id, submitted, completed, status
+            SELECT * FROM workflows
+            WHERE jobs=?
+        '''
+        jobs_json = encoder.encode(jobs)
+        cursor = self.database.execute(query, (jobs_json,))
+        return cursor.fetchone()
+
+    def add_workflow(self, name=None, log=None, jobs=None,
+                    priority=0, status=Status.Initialized):
+        """
+        Adds the workflow and returns its id
+        """
+        query = '''
+            INSERT INTO workflows(name, log, jobs, submitted, completed,
+                                status, priority)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        '''
+
+        if jobs:
+            job_json = encoder.encode(jobs)
+        else:
+            job_json = None
+
+        params = (name, log, job_json, time(), None, status, priority)
+
+        cursor = self.database.execute(query, params)
+        return cursor.lastrowid
+
+    def get_workflow(self, workflow_id):
+        """
+        Returns the pickled workflow from the database
+        """
+
+        query = """
+            SELECT *
             FROM workflows
-        '''
-        cursor = database.execute(query)
+            WHERE id=?
+        """
+        cursor = self.database.execute(query, (workflow_id,))
+        return cursor.fetchone()
 
-    return cursor.fetchall()
+    def update_workflow(self, workflow_id, name=None, log=None, jobs=None,
+                        priority=0):
+        """
+        Persists the pickled workflow into the database
+        """
+        query = """
+            UPDATE workflows
+            SET name=?, log=?, jobs=?, priority=?
+            WHERE id=?
+        """
+        if jobs:
+            job_json = encoder.encode(jobs)
+        else:
+            job_json = None
+
+        params = (name, log, job_json, priority, workflow_id)
+        self.database.execute(query, params)
+
+    def update_status(self, workflow_id, status, completed=False):
+        """
+        Updates the status of the workflow
+        """
+
+        if completed:
+            query = '''
+                UPDATE workflows
+                SET status=?, completed=? WHERE id=?
+            '''
+            params = (status, time(), workflow_id)
+        else:
+            query = '''
+                UPDATE workflows
+                SET status=? WHERE id=?
+            '''
+            params = (status, workflow_id)
+
+        self.database.execute(query, params)
+
+    def fetch(self, ids=None):
+        """
+        Returns a subset of workflows
+
+        If ids is specified the workflows will be limited to the subset of
+        of workflows with matching ids.
+        """
+
+        if ids:
+            query = '''
+                SELECT id, name, submitted, completed, status, priority
+                FROM workflows WHERE id IN ({ids})
+            '''
+
+            id_string = ",".join(set(str(workflow_id) for workflow_id in ids))
+            cursor = self.database.execute(query.format(ids=id_string))
+        else:
+            query = '''
+                SELECT id, name, submitted, completed, status, priority
+                FROM workflows
+            '''
+            cursor = self.database.execute(query)
+
+        return cursor.fetchall()
