@@ -238,9 +238,8 @@ class WorkflowManager(object):
     @classmethod
     def schedule(cls, workflow_id, workflow):
         '''Schedules a workflow by its id'''
-        status = Status.Scheduled
+        status = Status.Running
         items  = []
-        cls.store.update_status(workflow_id, status)
 
         for job in workflow.jobs:
             if job.completed():
@@ -252,6 +251,14 @@ class WorkflowManager(object):
             else:
                 job.status = 'scheduled'
 
+        workflow_helper = WorkflowHelper(workflow)
+
+        # Check to see if the workflow is already finished
+        if not items and workflow_helper.completed():
+            cls.store.update_status(workflow_id, Status.Completed)
+            return Status.Completed
+
+        cls.store.update_status(workflow_id, status)
         scheduler = ServiceManager.get("workqueue", "scheduler")
         scheduler.schedule(items, workflow_id, priority=workflow.priority)
         logger.info("WORKFLOW ID: %s", workflow_id)
