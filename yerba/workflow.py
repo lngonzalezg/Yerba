@@ -89,6 +89,7 @@ class Job(object):
         self._description = description
         self._info = {}
         self._errors = []
+        self.attempts = 1
         self._options = {
             "accepted-return-codes" : [ 0 ],
             "allow-zero-length" : True,
@@ -166,8 +167,10 @@ class Job(object):
 
         # No outputs present
         if not self.outputs:
+            logger.info("Checking return code status")
             if self.info:
                 returned = self.info['returned']
+                logger.info("Returned %s", returned)
 
             return any(returned == code for code in codes)
 
@@ -212,10 +215,10 @@ class Job(object):
         return True
 
     def restart(self):
-        self.options['retries'] = self.options['retries'] - 1
+        self.attempts = self.attempts + 1
 
     def failed(self):
-        return self.options['retries'] < 0
+        return self.attempts > self.options['retries']
 
     def __eq__(self, other):
         return (sorted(other.inputs) == sorted(self.inputs) and
@@ -292,8 +295,7 @@ class WorkflowHelper(object):
         '''
         Return the status of the workflow
         '''
-        if (any(job.failed() for job in self._workflow.jobs) or
-            any(job.status == 'failed' for job in self._workflow.jobs)):
+        if (any(job.status == 'failed' for job in self._workflow.jobs)):
             status = core.Status.Failed
         elif any(job.status == 'cancelled' for job in self._workflow.jobs):
             status = core.Status.Cancelled
