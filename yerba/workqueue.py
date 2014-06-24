@@ -199,8 +199,9 @@ class WorkQueueService(Service):
 
             del self.tasks[task.id]
         else:
+            ids = [str(workflow_id) for workflow_id in names]
             logger.info(('WORKQUEUE %s: The task %s failed notifying '
-                'workflows %s'), self.project, task.id, ', '.join(names))
+                'workflows %s'), self.project, task.id, ', '.join(ids))
             for name in names:
                 WorkflowManager.update(name, job, info)
 
