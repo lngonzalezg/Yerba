@@ -254,7 +254,7 @@ class WorkflowManager(object):
         completed = workflow_helper.completed()
 
         # Check to see if the workflow is already finished
-        if items and not completed:
+        if items:
             cls.store.update_status(workflow_id, Status.Running)
             scheduler = ServiceManager.get("workqueue", "scheduler")
             scheduler.schedule(items, workflow_id, priority=workflow.priority)
