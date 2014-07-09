@@ -1,6 +1,7 @@
 import atexit
 import json
 import logging
+from pprint import pformat
 from time import sleep
 
 import zmq
@@ -37,8 +38,8 @@ def listen_forever(config):
 
                 try:
                     data = socket.recv_string()
-                    logger.debug("ZMQ: Recieved %s", data)
                     msg = decoder.decode(data)
+                    logger.debug("ZMQ: Recieved \n%s", pformat(msg))
                 except Exception:
                     logger.exception("ZMQ: The message was not parsed")
 
