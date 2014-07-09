@@ -433,7 +433,7 @@ def generate_job(job_object):
 
 class WorkflowError(ValueError):
     def __init__(self, message, errors=None):
-        super(self, message)
+        super(ValueError, self).__init__(message)
         self._errors = errors
 
     @property

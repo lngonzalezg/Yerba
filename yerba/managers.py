@@ -199,9 +199,10 @@ class WorkflowManager(object):
         try:
             workflow = generate_workflow(data)
             logger.debug("WORKFLOW %s: submitted", workflow.name)
-        except WorkflowError:
+        except WorkflowError as e:
             logger.exception("WORKFLOW: the workflow failed to be generated")
-        except Exception:
+            return (None, Status.Error, e.errors)
+        except Exception as e:
             logger.exception("""WORKFLOW: An unexpected error occured during
                             workflow generation""")
             return (None, Status.Error, None)
