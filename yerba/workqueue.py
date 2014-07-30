@@ -228,10 +228,15 @@ class WorkQueueService(Service):
                 continue
 
             if not names:
-                del self.tasks[taskid]
-                logger.info('WORKQUEUE %s: The task %s was cancelled',
-                    self.project, taskid)
-                self.queue.cancel_by_taskid(taskid)
+                task = self.queue.cancel_by_taskid(taskid)
+
+                if task:
+                    del self.tasks[taskid]
+                    logger.info("WORKQUEUE %s: The task %s was cancelled",
+                        self.project, task.taskid)
+                else:
+                    logger.error("WORKQUEUE %s: failed to cancel %s",
+                        self.project, taskid)
             else:
                 msg = ('WORKQUEUE %s: The task %s was not cancelled '
                         'workflows %s depend on the task')

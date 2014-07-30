@@ -344,10 +344,10 @@ class WorkflowManager(object):
             logger.info(('WORKQUEUE %s: the workflow has been requested'
             'to be cancelled'), workflow.name)
 
-            cls.store.update_status(workflow_id, Status.Cancelled)
+            cls.store.update_status(int(workflow_id), Status.Cancelled)
 
             scheduler = ServiceManager.get("workqueue", "scheduler")
-            scheduler.cancel(workflow_id)
+            scheduler.cancel(int(workflow_id))
 
             for job in workflow.jobs:
                 if job.status == 'waiting':
