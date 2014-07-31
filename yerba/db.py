@@ -177,11 +177,11 @@ class WorkflowStore(object):
 
         query = '''
             UPDATE workflows
-            SET status=?
+            SET status=?, completed=?
             WHERE status=?
         '''
 
-        params = (Status.Stopped, Status.Running)
+        params = (Status.Stopped, time(), Status.Running)
         self.database.execute(query, params)
 
 
