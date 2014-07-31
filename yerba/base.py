@@ -20,6 +20,7 @@ def listen_forever(config):
     ServiceManager.register(wq)
     ServiceManager.start()
     WorkflowManager.connect(config.get('db', 'path'))
+    WorkflowManager.cleanup()
 
     connection_string = "tcp://*:{}".format(config.get('yerba', 'port'))
     context = zmq.Context()

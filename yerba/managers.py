@@ -391,3 +391,10 @@ class WorkflowManager(object):
 
         cls.workflows[wid] = workflow
         return cls.schedule(wid, workflow)
+
+    @classmethod
+    def cleanup(cls):
+        """
+        Go through all Running jobs and set there status to stopped.
+        """
+        cls.store.stop_workflows()

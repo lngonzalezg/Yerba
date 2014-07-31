@@ -170,6 +170,21 @@ class WorkflowStore(object):
 
         self.database.execute(query, params)
 
+    def stop_workflows(self):
+        """
+        Set the status of all Running jobs to stopped
+        """
+
+        query = '''
+            UPDATE workflows
+            SET status=?
+            WHERE status=?
+        '''
+
+        params = (Status.Stopped, Status.Running)
+        self.database.execute(query, params)
+
+
     def fetch(self, ids=None):
         """
         Returns a subset of workflows
