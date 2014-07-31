@@ -2,6 +2,7 @@ from datetime import datetime
 from logging import getLogger
 from os import getloadavg
 from time import time, sleep
+import json
 
 from yerba.core import Status
 from yerba.db import Database, WorkflowStore
@@ -360,3 +361,33 @@ class WorkflowManager(object):
             status = Status.Cancelled
 
         return status
+
+    @classmethod
+    def restart(cls, workflow_id):
+        workflow_found = cls.store.get_workflow(workflow_id)
+
+        if not workflow_found:
+            return Status.NotFound
+
+        (wid, name, log, jobs, _, _, priority, _) = workflow_found
+
+        data = {
+            "name": name,
+            "priority": priority,
+            "logfile": log,
+            "jobs": json.loads(jobs)
+        }
+
+        try:
+            workflow = generate_workflow(data)
+            logger.debug("WORKFLOW %s: submitted", workflow.name)
+        except WorkflowError as e:
+            logger.exception("WORKFLOW: the workflow failed to be generated")
+            return Status.Error
+        except Exception as e:
+            logger.exception("""WORKFLOW: An unexpected error occured during
+                            workflow generation""")
+            return Status.Error
+
+        cls.workflows[wid] = workflow
+        return cls.schedule(wid, workflow)

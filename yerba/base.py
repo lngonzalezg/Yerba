@@ -107,6 +107,19 @@ def schedule_workflow(data):
         "errors": errors
     }
 
+@route("restart")
+def restart_workflow(data):
+    '''Restart the job if it is running. Otherwise return NotFound'''
+    logger.info("##### WORKFLOW RESTART #####")
+    try:
+        identity = data['id']
+        status = WorkflowManager.restart(identity)
+        logger.info(status_message(identity, status))
+        return {"status" : status_name(status)}
+    except KeyError:
+        return {"status" : 'NotFound'}
+
+
 @route("cancel")
 def cancel_workflow(data):
     '''Cancels the job if it is running.'''
