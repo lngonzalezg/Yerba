@@ -345,7 +345,7 @@ class WorkflowManager(object):
             logger.info(('WORKQUEUE %s: the workflow has been requested'
             'to be cancelled'), workflow.name)
 
-            cls.store.update_status(int(workflow_id), Status.Cancelled)
+            cls.store.update_status(int(workflow_id), Status.Cancelled, completed=True)
 
             scheduler = ServiceManager.get("workqueue", "scheduler")
             scheduler.cancel(int(workflow_id))
@@ -390,6 +390,7 @@ class WorkflowManager(object):
             return Status.Error
 
         cls.workflows[wid] = workflow
+        cls.store.restart_workflow(workflow_id)
         return cls.schedule(wid, workflow)
 
     @classmethod

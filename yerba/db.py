@@ -155,19 +155,29 @@ class WorkflowStore(object):
         Updates the status of the workflow
         """
 
+        query = '''
+            UPDATE workflows
+            SET status=?, completed=? WHERE id=?
+        '''
+
         if completed:
-            query = '''
-                UPDATE workflows
-                SET status=?, completed=? WHERE id=?
-            '''
             params = (status, time(), workflow_id)
         else:
-            query = '''
-                UPDATE workflows
-                SET status=? WHERE id=?
-            '''
-            params = (status, workflow_id)
+            params = (status, None, workflow_id)
 
+        self.database.execute(query, params)
+
+    def restart_workflow(self, workflow_id):
+        """
+        Update the time the workflow was started
+        """
+
+        query = '''
+            UPDATE workflows
+            SET submitted=? WHERE id=?
+        '''
+
+        params = (time(), workflow_id)
         self.database.execute(query, params)
 
     def stop_workflows(self):
