@@ -23,9 +23,6 @@ def _format_args(args):
 
 def log_job_info(log_file, job):
     '''Log the results of a job'''
-    if not log_file or not os.path.isfile(log_file):
-        return
-
     outputs = []
     msg = (
         "Job: {cmd}\n"
@@ -56,9 +53,6 @@ def log_job_info(log_file, job):
 
 def log_skipped_job(log_file, job):
     '''Log a job that was skipped'''
-    if not log_file or not os.path.isfile(log_file):
-        return
-
     with open(log_file, 'a') as log_handle:
         log_handle.write('#' * 25 + '\n')
         log_handle.write('{0}\n'.format(job.description))
