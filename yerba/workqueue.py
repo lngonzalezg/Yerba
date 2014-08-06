@@ -31,7 +31,7 @@ def get_task_info(task):
         'elapsed' : execution_time,
         'taskid' : task.id,
         'returned' : task.return_status,
-        'output' : task.output,
+        'output' : repr(task.output),
     }
 
 class WorkQueueService(Service):

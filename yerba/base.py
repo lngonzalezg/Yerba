@@ -56,11 +56,17 @@ def listen_forever(config):
 
                 if not response:
                     logger.info("Invalid request: %s", msg)
-                    response = {"status" : "error"}
+                    response = {"status" : "Failed", "error": "Invalid response"}
+
+                try:
+                    message = json.dumps(response, encoding="utf-8", ensure_ascii=False)
+                except Exception:
+                    message = json.dumps({"status": "Failed", "error": "Invalid json"})
+                    logger.exception("INVALID JSON RESPONSE:\n %s", pformat(response))
 
                 try:
                     logger.info("Sending Response")
-                    socket.send_json(response, flags=zmq.NOBLOCK)
+                    socket.send_unicode(message, flags=zmq.NOBLOCK)
                 except zmq.Again:
                     logger.exception("Failed to respond with response %s",
                         response)
