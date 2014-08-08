@@ -316,6 +316,11 @@ class WorkflowManager(object):
                 for job in workflow.jobs:
                     if job.status == 'scheduled':
                         log_not_run_job(workflow.log, job)
+            else:
+                iterable = cls.fetch(workflow_id)
+                scheduler = ServiceManager.get("workqueue", "scheduler")
+                scheduler.schedule(iterable, workflow_id,
+                                   priority=workflow.priority)
 
             if status != Status.Running:
                 cls.store.update_status(workflow_id, status,

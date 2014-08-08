@@ -173,44 +173,8 @@ class WorkQueueService(Service):
         info = get_task_info(task)
 
         items = {}
-
-        if job.completed(returned=task.return_status):
-            for name in names:
-                fetch_message = ('WORKQUEUE %s: Fetching next jobs '
-                        'in workflow %s')
-                logger.info(fetch_message, self.project, name)
-
-                #XXX: Need to update returned jobs first
-                WorkflowManager.update(name, job, info)
-
-                iterable = WorkflowManager.fetch(name)
-                if iterable:
-                    items[name] = iterable
-
-            del self.tasks[task.id]
-
-        elif not job.failed():
-            logger.info(('WORKQUEUE %s: The task %s failed attempting '
-                    'to rerun the task'), self.project, task.id)
-            job.restart()
-            for name in names:
-                items[name] = [job]
-                WorkflowManager.update(name, job, info)
-
-            del self.tasks[task.id]
-        else:
-            ids = [str(workflow_id) for workflow_id in names]
-            logger.info(('WORKQUEUE %s: The task %s failed notifying '
-                'workflows %s'), self.project, task.id, ', '.join(ids))
-            for name in names:
-                WorkflowManager.update(name, job, info)
-
-            del self.tasks[task.id]
-
-        for (name, iterable) in items.items():
-            self.schedule(iterable, name)
-
-        logger.info("######### END WORKQUEUE UPDATING ##########")
+        for name in names:
+            WorkflowManager.update(name, job, info)
 
     def cancel(self, name):
         '''
