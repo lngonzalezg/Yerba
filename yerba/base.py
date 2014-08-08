@@ -5,7 +5,8 @@ from pprint import pformat
 from time import sleep
 
 import zmq
-from yerba.core import status_message, status_name
+from yerba.core import (status_message, status_name, EventNotifier,
+                        SCHEDULE_TASK, CANCEL_TASK, TASK_DONE)
 from yerba.managers import (ServiceManager, WorkflowManager)
 from yerba.routes import (route, dispatch)
 from yerba.workflow import WorkflowError
@@ -16,11 +17,18 @@ running = True
 decoder = json.JSONDecoder()
 
 def listen_forever(config):
-    wq = WorkQueueService(dict(config.items('workqueue')))
+    notifier = EventNotifier()
+    wq = WorkQueueService(dict(config.items('workqueue')), notifier)
     ServiceManager.register(wq)
     ServiceManager.start()
     WorkflowManager.connect(config.get('db', 'path'))
+    WorkflowManager.set_notifier(notifier)
     WorkflowManager.cleanup()
+
+    #: Register for events to be notified by
+    notifier.register(TASK_DONE, WorkflowManager.update)
+    notifier.register(CANCEL_TASK, wq.cancel)
+    notifier.register(SCHEDULE_TASK, wq.schedule)
 
     connection_string = "tcp://*:{}".format(config.get('yerba', 'port'))
     context = zmq.Context()

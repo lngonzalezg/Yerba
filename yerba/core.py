@@ -1,4 +1,4 @@
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 
 _status_types = [
     "Initialized",
@@ -33,3 +33,30 @@ _status_messages = {
 def status_message(name, code):
     return _status_messages[code].format(name)
 
+
+SCHEDULE_TASK = 'schedule'
+CANCEL_TASK = 'cancel'
+TASK_DONE = 'done'
+
+class EventNotifier(object):
+    def __init__(self):
+        self.events = defaultdict(list)
+
+    def notify(self, event, *args, **kw):
+        '''
+        Notify all registered recievers for the event
+        '''
+        for callback in self.events[event]:
+            callback(*args, **kw)
+
+    def register(self, event, reciever):
+        '''
+        Register the reciever to be notified for the event
+        '''
+        self.events[event].append(reciever)
+
+    def unregister(self, event, receiver):
+        '''
+        Unregister the reciever from event
+        '''
+        self.events[event].remove(receiver)

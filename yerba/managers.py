@@ -4,7 +4,7 @@ from os import getloadavg
 from time import time, sleep
 import json
 
-from yerba.core import Status
+from yerba.core import Status, SCHEDULE_TASK, CANCEL_TASK
 from yerba.db import Database, WorkflowStore
 from yerba.workflow import (generate_workflow, WorkflowHelper, WorkflowError,
                             log_not_run_job, log_job_info, log_skipped_job)
@@ -171,6 +171,12 @@ class WorkflowManager(object):
     database = Database()
     store = None
     workflows = {}
+    notifier = None
+
+    @classmethod
+    def set_notifier(cls, notifier):
+        '''Sets the notifier object'''
+        cls.notifier = notifier
 
     @classmethod
     def connect(cls, filename):
@@ -258,10 +264,9 @@ class WorkflowManager(object):
         # Check to see if the workflow is already finished
         if items:
             cls.store.update_status(workflow_id, Status.Running)
-            scheduler = ServiceManager.get("workqueue", "scheduler")
-            scheduler.schedule(items, workflow_id, priority=workflow.priority)
+            cls.notifier.notify(SCHEDULE_TASK, items, workflow_id,
+                                priority=workflow.priority)
             logger.info("WORKFLOW ID: %s", workflow_id)
-
             return Status.Running
         elif completed:
             cls.store.update_status(workflow_id, Status.Completed)
@@ -318,9 +323,8 @@ class WorkflowManager(object):
                         log_not_run_job(workflow.log, job)
             else:
                 iterable = cls.fetch(workflow_id)
-                scheduler = ServiceManager.get("workqueue", "scheduler")
-                scheduler.schedule(iterable, workflow_id,
-                                   priority=workflow.priority)
+                cls.notifier.notify(SCHEDULE_TASK, iterable, workflow_id,
+                                    priority=workflow.priority)
 
             if status != Status.Running:
                 cls.store.update_status(workflow_id, status,
@@ -351,9 +355,7 @@ class WorkflowManager(object):
             'to be cancelled'), workflow.name)
 
             cls.store.update_status(int(workflow_id), Status.Cancelled, completed=True)
-
-            scheduler = ServiceManager.get("workqueue", "scheduler")
-            scheduler.cancel(int(workflow_id))
+            cls.notifier.notify(CANCEL_TASK, int(workflow_id))
 
             for job in workflow.jobs:
                 if job.status == 'waiting':

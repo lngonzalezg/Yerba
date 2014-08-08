@@ -7,7 +7,7 @@ from sys import exit
 
 import work_queue as wq
 
-from yerba.managers import WorkflowManager
+from yerba.core import TASK_DONE
 from yerba.services import Service
 
 logger = getLogger('yerba.workqueue')
@@ -38,8 +38,9 @@ class WorkQueueService(Service):
     name = "workqueue"
     group = "scheduler"
 
-    def __init__(self, config):
+    def __init__(self, config, notifier):
         self.tasks = {}
+        self.notifier = notifier
 
         try:
             self.project = config['project']
@@ -173,8 +174,11 @@ class WorkQueueService(Service):
         info = get_task_info(task)
 
         items = {}
-        for name in names:
-            WorkflowManager.update(name, job, info)
+
+        for workflow in names:
+            self.notifier.notify(TASK_DONE, workflow, job, info)
+
+        logger.info("######### WORKQUEUE END UPDATING ##########")
 
     def cancel(self, name):
         '''
