@@ -6,7 +6,7 @@ import json
 
 from yerba.core import Status, SCHEDULE_TASK, CANCEL_TASK
 from yerba.db import Database, WorkflowStore
-from yerba.workflow import (generate_workflow, WorkflowHelper, WorkflowError,
+from yerba.workflow import (generate_workflow, WorkflowError,
                             log_not_run_job, log_job_info, log_skipped_job)
 from yerba.utils import ignored, meminfo
 
@@ -71,11 +71,6 @@ class ServiceManager(object):
         for service in cls.core.values():
             service.update()
 
-        current_time = time()
-        if (current_time - cls.previous) > cls.refresh:
-            cls.previous = current_time
-            report_state()
-
     @classmethod
     def stop(cls):
         '''Stops the service manager and all core'''
@@ -89,10 +84,7 @@ def report_state():
 
     workflow_status = ["INTERNAL STATE CHECK\n----WORKFLOW STATUS--\n"]
     for (workflow_id, workflow) in WorkflowManager.workflows.items():
-        helper = WorkflowHelper(workflow)
-        msg = "--WORKFLOW (status = {0}): {1} ({2})\n"
-        workflow_status.append(msg.format(helper.status(), workflow_id, helper.message()))
-
+        workflow_status.append(workflow.status_message())
 
     stats = wq.queue.stats
 
@@ -226,6 +218,7 @@ class WorkflowManager(object):
             (workflow_id, _, _, _, _, _, _, status) = workflow_found
 
             if workflow_id in cls.workflows and status == Status.Running:
+                logger.info("WORKFLOW %s: already runnning", workflow_id)
                 return (workflow_id, status, None)
 
             if status == Status.Initialized:
@@ -246,35 +239,17 @@ class WorkflowManager(object):
     @classmethod
     def schedule(cls, workflow_id, workflow):
         '''Schedules a workflow by its id'''
-        items  = []
 
-        for job in workflow.jobs:
-            if job.completed():
-                job.status = 'skipped'
-                log_skipped_job(workflow.log, job)
-            elif job.ready():
-                job.status = 'running'
-                items.append(job)
-            else:
-                job.status = 'scheduled'
+        jobs = workflow.next()
+        cls.store.update_status(workflow_id, workflow.status)
 
-        workflow_helper = WorkflowHelper(workflow)
-        completed = workflow_helper.completed()
-
-        # Check to see if the workflow is already finished
-        if items:
-            cls.store.update_status(workflow_id, Status.Running)
-            cls.notifier.notify(SCHEDULE_TASK, items, workflow_id,
+        #: Submit any jobs to the queue
+        if jobs:
+            cls.notifier.notify(SCHEDULE_TASK, jobs, workflow_id,
                                 priority=workflow.priority)
             logger.info("WORKFLOW ID: %s", workflow_id)
-            return Status.Running
-        elif completed:
-            cls.store.update_status(workflow_id, Status.Completed)
-            return Status.Completed
-        else:
-            cls.store.update_status(workflow_id, Status.Error)
-            return Status.Error
 
+        return workflow.status
 
     @classmethod
     def get_workflows(cls, ids):
@@ -282,55 +257,24 @@ class WorkflowManager(object):
         return cls.store.fetch(ids)
 
     @classmethod
-    def fetch(cls, workflow_id):
-        '''Gets the next set of jobs to be run.'''
-        iterable = []
-
-        with ignored(KeyError):
-            workflow = cls.workflows[workflow_id]
-            workflow_helper = WorkflowHelper(workflow)
-            iterable = workflow_helper.waiting()
-
-            for job in iterable:
-                logger.debug('WORKFLOW %s: changing job %s status to running',
-                        workflow.name, job)
-                job.status = 'running'
-
-        return iterable
-
-    @classmethod
     def update(cls, workflow_id, job, info):
         '''Updates the job with details'''
 
         with ignored(KeyError):
             workflow = cls.workflows[workflow_id]
-            workflow_helper = WorkflowHelper(workflow)
-            workflow_helper.add_job_info(job, info)
 
-            if workflow.log:
-                log_job_info(workflow.log, job)
+            #: Update the status of the workflow
+            status = workflow.update_status(job, info)
+            logger.info("WORKFLOW %s: update_status=%s", workflow.name, status)
 
-            if job.status == 'running' and job.completed():
-                job.status = 'completed'
-            elif job.failed():
-                job.status = 'failed'
-
-            status = workflow_helper.status()
-
-            if status == Status.Failed:
-                for job in workflow.jobs:
-                    if job.status == 'scheduled':
-                        log_not_run_job(workflow.log, job)
-            else:
-                iterable = cls.fetch(workflow_id)
-                cls.notifier.notify(SCHEDULE_TASK, iterable, workflow_id,
-                                    priority=workflow.priority)
-
+            #: Save the status to the store and submit tasks
             if status != Status.Running:
                 cls.store.update_status(workflow_id, status,
                                  completed=True)
-                cls.workflows[workflow_id]._logged = True
             else:
+                iterable = workflow.next()
+                cls.notifier.notify(SCHEDULE_TASK, iterable, workflow_id,
+                                    priority=workflow.priority)
                 cls.store.update_status(workflow_id, status)
 
     @classmethod
@@ -340,7 +284,8 @@ class WorkflowManager(object):
         jobs = []
 
         with ignored(KeyError):
-            jobs = [job.state for job in cls.workflows[int(workflow_id)].jobs]
+            workflow = cls.workflows[int(workflow_id)]
+            jobs = workflow.state()
 
         return (status, jobs)
 
@@ -354,18 +299,11 @@ class WorkflowManager(object):
             logger.info(('WORKQUEUE %s: the workflow has been requested'
             'to be cancelled'), workflow.name)
 
-            cls.store.update_status(int(workflow_id), Status.Cancelled, completed=True)
+            workflow.cancel()
+            status = workflow.status
+
+            cls.store.update_status(int(workflow_id), status, completed=True)
             cls.notifier.notify(CANCEL_TASK, int(workflow_id))
-
-            for job in workflow.jobs:
-                if job.status == 'waiting':
-                    job.status = 'cancelled'
-                elif job.status == 'running':
-                    job.status = 'cancelled'
-                elif job.status == 'scheduled':
-                    job.status = 'cancelled'
-
-            status = Status.Cancelled
 
         return status
 

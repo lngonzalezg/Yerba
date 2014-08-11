@@ -1,3 +1,4 @@
+from itertools import groupby
 import logging
 import os
 
@@ -6,6 +7,19 @@ from yerba import db
 from yerba import utils
 
 logger = logging.getLogger('yerba.workflow')
+
+WAITING = 'waiting'
+SCHEDULED = 'scheduled'
+RUNNING = 'running'
+COMPLETED = 'completed'
+FAILED = 'failed'
+CANCELLED = 'cancelled'
+STOPPED = 'stopped'
+SKIPPED = 'skipped'
+
+READY_STATES = frozenset([WAITING, SCHEDULED])
+RUNNING_STATES = frozenset([WAITING, SCHEDULED, RUNNING])
+FINISHED_STATES = frozenset([STOPPED, CANCELLED, FAILED, COMPLETED, SKIPPED])
 
 def _format_args(args):
     argstring = ""
@@ -79,7 +93,7 @@ class Job(object):
         self.args = arguments
         self.inputs = []
         self.outputs = []
-        self._status = 'waiting'
+        self._status = 'scheduled'
         self._description = description
         self._info = {}
         self._errors = []
@@ -225,104 +239,151 @@ class Job(object):
     def __str__(self):
         return repr(self)
 
-class WorkflowHelper(object):
-    def __init__(self, workflow):
-        self._workflow = workflow
-
-    @property
-    def workflow(self):
-        return self._workflow
-
-    def waiting(self):
-        '''
-        Return the set of jobs waiting to be scheduled.
-        '''
-        return self.ready() - self.completed()
-
-    def completed(self):
-        '''
-        Return the set of jobs that are completed
-        '''
-        return {job for job in self._workflow.jobs if job.completed()}
-
-    def ready(self):
-        '''
-        Return the set of jobs that are ready
-        '''
-        return {job for job in self._workflow.jobs if job.ready()}
-
-    def running(self):
-        '''
-        Return the set of jobs that are running
-        '''
-        return {job for job in self.workflow.jobs if job.running()}
-
-    def failed(self):
-        '''
-        Return the set of jobs that failed
-        '''
-        return {job for job in self.workflow.jobs if job.failed()}
-
-    def add_job_info(self, selected, info):
-        '''
-        Adds job information for the selected job
-        '''
-        for job in self._workflow.jobs:
-            if job == selected:
-                logger.info("WORKFLOW %s: Added info to job %s",
-                        self.workflow.name, job)
-                job.info = info
-
-    def message(self):
-        message = ("name: {0}, completed: {1}, failed: {2}, running: {3},",
-        " waiting: {4}")
-
-        jobs = (self.workflow.name,
-            len(self.completed()),
-            len(self.failed()),
-            len(self.running()),
-            len(self.waiting()))
-
-        return "".join(message).format(*jobs)
-
-    def status(self):
-        '''
-        Return the status of the workflow
-        '''
-        if (any(job.status == 'failed' for job in self._workflow.jobs)):
-            status = core.Status.Failed
-        elif any(job.status == 'cancelled' for job in self._workflow.jobs):
-            status = core.Status.Cancelled
-        elif self.waiting():
-            status = core.Status.Running
-        else:
-            status = core.Status.Completed
-
-        return status
-
+#FIXME: states for jobs should be decoupled from jobs
+#TODO: Add proper dependency management to jobs
 class Workflow(object):
     def __init__(self, name, jobs, log=None, priority=0):
-        self._name = name
-        self._log = log
-        self._priority = priority
-        self._jobs = jobs
-        self._logged = False
+        self.name = name
+        self.log = log
+        self.priority = priority
+        self.jobs = tuple(jobs)
+        self.available = jobs
+        self.running = []
+        self.completed = []
+        self.status = core.Status.Initialized
 
-    @property
-    def jobs(self):
-        return self._jobs
+    def update_status(self, job, info):
+        '''Updates the status of the workflow'''
+        #: Assign the info object to the job
+        job.info = info
 
-    @property
-    def log(self):
-        return self._log
+        #: Remove the job from the running list
+        self.running.remove(job)
 
-    @property
-    def name(self):
-        return self._name
+        #FIXME: add workflow change events
+        #: Update the workflow log
+        if self.log:
+            log_job_info(self.log, job)
 
-    @property
-    def priority(self):
-        return self._priority
+        #: Check that job returned successfully
+        if info['returned'] != 0 or not job.completed():
+            job.status = FAILED
+            self.completed.append(job)
+            self.status = core.Status.Failed
+            return self.status
+
+        #: Update the status to completed
+        job.status = COMPLETED
+
+        #: Check if the workflow finished
+        if self._finished():
+            self.status = core.Status.Completed
+            return self.status
+
+        #: Check that the workflow can proceed from this point
+        if self._can_proceed():
+            self.status = core.Status.Running
+            return self.status
+        else:
+            self._failed()
+            self.status = core.Status.Failed
+            return self.status
+
+    def next(self):
+        '''Return the next set of available jobs'''
+        available = []
+        skipped = []
+
+        for job in self.available:
+            if job.completed():
+                skipped.append(job)
+                continue
+
+            if job.ready() and job.status in READY_STATES:
+                self.available.remove(job)
+                self.running.append(job)
+                available.append(job)
+                job.status = RUNNING
+
+        for job in skipped:
+            self._skip(job)
+
+        #: Check if any tasks are busy
+        if available or self.running:
+            self.status = core.Status.Running
+        elif not self.available:
+            #: Check if all jobs have been skipped
+            self.status = core.Status.Completed
+        else:
+            self._failed()
+            self.status = core.Status.Failed
+
+        return available
+
+    def cancel(self):
+        ''' Sets the state of the workflow as cancelled'''
+        self.status = core.Status.Cancelled
+
+        for job in self.available:
+            if job in RUNNING_STATES:
+                job.status = CANCELLED
+
+    def stop(self):
+        ''' Sets the state of the workflow as stopped'''
+        self.status = core.Status.Stopped
+
+        for job in self.available:
+            if job in RUNNING_STATES:
+                job.status = STOPPED
+
+    def state(self):
+        """Returns the state of the workflow"""
+        return [job.state for job in self.jobs]
+
+    def _finished(self):
+        """Returns True when all jobs have been finished"""
+        return not self.available and not self.running
+
+    def _can_proceed(self):
+        """
+        Returns whether the workflow can continue.
+        """
+        #: Get the number of running jobs
+        total_running = len(self.running)
+
+        #: Check if any jobs are still waiting
+        waiting = [job for job in self.available if job.status in READY_STATES]
+
+        #: Get the number of ready jobs
+        total_ready = len([job for job in waiting if job.ready()]) > 0
+
+        #: Proceed if a job is running or a job is ready
+        return total_ready or total_running
+
+    def _failed(self):
+        '''Sets a job into the failed state'''
+        for job in self.available:
+            job.status = FAILED
+            #FIXME: add workflow change events
+            log_not_run_job(self.log, job)
+
+    def _skip(self, job):
+        '''Sets a job into a skipped state'''
+        job.status = SKIPPED
+        self.available.remove(job)
+        self.completed.append(job)
+
+    def status_message(self):
+        prefix = "WORKFLOW{0}: " % self.name
+        states = sorted(job.state for job in self.available + self.completed)
+
+        #: summarize the number of jobs in each state
+        fields = [",".join([state, len(jobs)]) for state,jobs in groupby(states)]
+
+        #: summary of the workflows status
+        summary = " ".join(fields)
+
+        return prefix + summary
 
 def filter_options(options):
     """
@@ -425,15 +486,7 @@ def generate_job(job_object):
     return new_job
 
 
-class WorkflowError(ValueError):
+class WorkflowError(Exception):
     def __init__(self, message, errors=None):
-        super(ValueError, self).__init__(message)
-        self._errors = errors
-
-    @property
-    def errors(self):
-        """
-        Returns a list of invalid jobs
-        """
-        return self._errors
-
+        Exception.__init__(self, message)
+        self.errors = errors
