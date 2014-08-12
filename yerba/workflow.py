@@ -333,7 +333,7 @@ class Workflow(object):
         ''' Sets the state of the workflow as cancelled'''
         self.status = core.Status.Cancelled
 
-        for job in self.available:
+        for job in self.available + self.running:
             if job in RUNNING_STATES:
                 job.status = CANCELLED
 
@@ -341,7 +341,7 @@ class Workflow(object):
         ''' Sets the state of the workflow as stopped'''
         self.status = core.Status.Stopped
 
-        for job in self.available:
+        for job in self.available + self.running:
             if job in RUNNING_STATES:
                 job.status = STOPPED
 
