@@ -22,6 +22,7 @@ RUNNING_STATES = frozenset([WAITING, SCHEDULED, RUNNING])
 FINISHED_STATES = frozenset([STOPPED, CANCELLED, FAILED, COMPLETED, SKIPPED])
 
 def _format_args(args):
+    """Returns given a list of args returns an argument string"""
     argstring = ""
 
     for (arg, value, shorten) in args:
@@ -33,7 +34,6 @@ def _format_args(args):
         argstring = ("%s %s %s" % (argstring, arg, val))
 
     return argstring
-
 
 def log_job_info(log_file, job):
     '''Log the results of a job'''
@@ -76,9 +76,6 @@ def log_skipped_job(log_file, job):
 
 def log_not_run_job(log_file, job):
     '''Log a job that could not be run'''
-    if not log_file or not os.path.isfile(log_file):
-        return
-
     with open(log_file, 'a') as log_handle:
         log_handle.write('#' * 25 + '\n')
         log_handle.write('{0}\n'.format(job.description))
@@ -94,12 +91,11 @@ class Job(object):
         self.inputs = []
         self.outputs = []
         self._status = 'scheduled'
-        self._description = description
+        self.description = description
         self._info = {}
         self._errors = []
         self.attempts = 1
         self._options = {
-            "accepted-return-codes" : [ 0 ],
             "allow-zero-length" : True,
             "retries" : 0
         }
@@ -125,14 +121,6 @@ class Job(object):
         self._status = value
 
     @property
-    def errors(self):
-        return self._errors
-
-    @errors.setter
-    def errors(self, error):
-        self._errors.append(error)
-
-    @property
     def info(self):
         return self._info
 
@@ -143,17 +131,12 @@ class Job(object):
         self._info = info
 
     @property
-    def description(self):
-        return self._description
-
-    @property
     def state(self):
         #FIXME add support for errors
 
         status = [
             ['status', self.status],
             ['description', self.description],
-            ['errors', self.errors]
         ]
 
         status.extend(self.info.items())
@@ -169,18 +152,8 @@ class Job(object):
     def running(self):
         return self._status == 'running'
 
-    def completed(self, returned=None):
+    def completed(self):
         '''Returns whether or not the job was completed.'''
-        codes = self.options['accepted-return-codes']
-
-        # No outputs present
-        if not self.outputs:
-            logger.info("Checking return code status")
-            if self.info:
-                returned = self.info['returned']
-                logger.info("Returned %s", returned)
-
-            return any(returned == code for code in codes)
 
         for fp in self.outputs:
             if isinstance(fp, list) and fp[1]:
@@ -434,6 +407,9 @@ def generate_workflow(workflow_object):
     level = workflow_object.get('priority', 0)
     logfile = workflow_object.get('logfile', None)
 
+    if logfile:
+        os.mkdir(os.path.dirname(logfile))
+
     errors = []
 
     # Verify jobs and save errors
@@ -487,6 +463,7 @@ def generate_job(job_object):
 
 
 class WorkflowError(Exception):
+    """Error reported when workflow fails to be created"""
     def __init__(self, message, errors=None):
         Exception.__init__(self, message)
         self.errors = errors

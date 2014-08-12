@@ -173,8 +173,6 @@ class WorkQueueService(Service):
         (names, job) = self.tasks[task.id]
         info = get_task_info(task)
 
-        items = {}
-
         for workflow in names:
             self.notifier.notify(TASK_DONE, workflow, job, info)
 

@@ -6,8 +6,7 @@ import json
 
 from yerba.core import Status, SCHEDULE_TASK, CANCEL_TASK
 from yerba.db import Database, WorkflowStore
-from yerba.workflow import (generate_workflow, WorkflowError,
-                            log_not_run_job, log_job_info, log_skipped_job)
+from yerba.workflow import WorkflowError
 from yerba.utils import ignored, meminfo
 
 logger = getLogger('yerba.manager')
