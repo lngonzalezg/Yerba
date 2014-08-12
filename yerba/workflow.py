@@ -406,7 +406,8 @@ class Workflow(object):
         level = workflow_object.get('priority', 0)
         logfile = workflow_object.get('logfile', None)
 
-        if logfile:
+        #: Create the directory to the log file
+        with utils.ignored(OSError, AttributeError):
             os.mkdir(os.path.dirname(logfile))
 
         errors = []
