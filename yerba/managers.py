@@ -6,7 +6,7 @@ import json
 
 from yerba.core import Status, SCHEDULE_TASK, CANCEL_TASK
 from yerba.db import Database, WorkflowStore
-from yerba.workflow import WorkflowError
+from yerba.workflow import WorkflowError, Workflow
 from yerba.utils import ignored, meminfo
 
 logger = getLogger('yerba.manager')
@@ -195,7 +195,7 @@ class WorkflowManager(object):
         workflow_id = data.get('id', None)
 
         try:
-            workflow = generate_workflow(data)
+            workflow = Workflow.from_object(data)
             logger.debug("WORKFLOW %s: submitted", workflow.name)
         except WorkflowError as e:
             logger.exception("WORKFLOW: the workflow failed to be generated")
@@ -323,7 +323,7 @@ class WorkflowManager(object):
         }
 
         try:
-            workflow = generate_workflow(data)
+            workflow = Workflow.from_object(data)
             logger.debug("WORKFLOW %s: submitted", workflow.name)
         except WorkflowError as e:
             logger.exception("WORKFLOW: the workflow failed to be generated")

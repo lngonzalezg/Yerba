@@ -100,6 +100,41 @@ class Job(object):
             "retries" : 0
         }
 
+    @classmethod
+    def from_object(cls, job_object):
+        """
+        Returns a job generated from a python object
+        """
+        (cmd, script, args) = (job_object['cmd'], job_object['script'],
+                            job_object.get('args', []))
+
+        arg_string = _format_args(args)
+
+        # Set the job_object description
+        desc = job_object.get('description', '')
+        new_job = cls(cmd, script, arg_string, description=desc)
+        logger.debug("Creating job %s",  new_job.description)
+
+        # Set the job_object options
+        options = job_object.get('options', {})
+        logger.info("Additional job options being set %s", options)
+        new_job.options = filter_options(options)
+
+        # Add inputs
+        inputs = job_object.get('inputs', []) or []
+        new_job.inputs.extend(sorted(inputs))
+
+        # Add outputs
+        outputs = job_object.get('outputs', []) or []
+        new_job.outputs.extend(sorted(outputs))
+
+        if 'overwrite' in job_object and int(job_object['overwrite']):
+            logger.debug(("The job will overwrite previous"
+                "results:\n%s"), new_job)
+            new_job.clear()
+
+        return new_job
+
     @property
     def options(self):
         return self._options
@@ -358,6 +393,39 @@ class Workflow(object):
 
         return prefix + summary
 
+    @classmethod
+    def from_object(cls, workflow_object):
+        '''Generates a workflow from a python object.'''
+        logger.info("######### Generate Workflow  ##########")
+        job_objects = workflow_object.get('jobs', [])
+
+        if not job_objects:
+            raise WorkflowError("The workflow does not contain any jobs.")
+
+        name = workflow_object.get('name', 'unnamed')
+        level = workflow_object.get('priority', 0)
+        logfile = workflow_object.get('logfile', None)
+
+        if logfile:
+            os.mkdir(os.path.dirname(logfile))
+
+        errors = []
+
+        # Verify jobs and save errors
+        for (index, job_object) in enumerate(job_objects):
+            (valid, reason) = validate_job(job_object)
+
+            if not valid:
+                errors.append((index, reason))
+
+        if errors:
+            raise WorkflowError("%s jobs where not valid." % len(errors), errors)
+
+        jobs = [Job.from_object(job_object) for job_object in job_objects]
+        workflow = cls(name, jobs, log=logfile, priority=level)
+        logger.info("WORKFLOW %s has been generated.", name)
+        return workflow
+
 def filter_options(options):
     """
     Returns the set of filtered options that are specified
@@ -394,73 +462,6 @@ def validate_job(job_object):
         return (False, "An output was invalid")
 
     return (True, "The job has been validated")
-
-def generate_workflow(workflow_object):
-    '''Generates a workflow from a python object.'''
-    logger.info("######### Generate Workflow  ##########")
-    job_objects = workflow_object.get('jobs', [])
-
-    if not job_objects:
-        raise WorkflowError("The workflow does not contain any jobs.")
-
-    name = workflow_object.get('name', 'unnamed')
-    level = workflow_object.get('priority', 0)
-    logfile = workflow_object.get('logfile', None)
-
-    if logfile:
-        os.mkdir(os.path.dirname(logfile))
-
-    errors = []
-
-    # Verify jobs and save errors
-    for (index, job_object) in enumerate(job_objects):
-        (valid, reason) = validate_job(job_object)
-
-        if not valid:
-            errors.append((index, reason))
-
-    if errors:
-        raise WorkflowError("%s jobs where not valid." % len(errors), errors)
-
-    jobs = [generate_job(job_object) for job_object in job_objects]
-    workflow = Workflow(name, jobs, log=logfile, priority=level)
-    logger.info("WORKFLOW %s has been generated.", name)
-    return workflow
-
-def generate_job(job_object):
-    """
-    Returns a job generated from a python object
-    """
-    (cmd, script, args) = (job_object['cmd'], job_object['script'],
-                           job_object.get('args', []))
-
-    arg_string = _format_args(args)
-
-    # Set the job_object description
-    desc = job_object.get('description', '')
-    new_job = Job(cmd, script, arg_string, description=desc)
-    logger.debug("Creating job %s",  new_job.description)
-
-    # Set the job_object options
-    options = job_object.get('options', {})
-    logger.info("Additional job options being set %s", options)
-    new_job.options = filter_options(options)
-
-    # Add inputs
-    inputs = job_object.get('inputs', []) or []
-    new_job.inputs.extend(sorted(inputs))
-
-    # Add outputs
-    outputs = job_object.get('outputs', []) or []
-    new_job.outputs.extend(sorted(outputs))
-
-    if 'overwrite' in job_object and int(job_object['overwrite']):
-        logger.debug(("The job will overwrite previous"
-            "results:\n%s"), new_job)
-        new_job.clear()
-
-    return new_job
-
 
 class WorkflowError(Exception):
     """Error reported when workflow fails to be created"""
