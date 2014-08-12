@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from json import JSONEncoder
 from sqlite3 import connect, IntegrityError
 from time import time

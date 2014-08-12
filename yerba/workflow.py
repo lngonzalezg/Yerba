@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from itertools import groupby
 import logging
 import os
