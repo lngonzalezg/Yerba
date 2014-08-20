@@ -264,18 +264,22 @@ class WorkflowManager(object):
             workflow = cls.workflows[workflow_id]
 
             #: Update the status of the workflow
-            status = workflow.update_status(job, info)
-            logger.info("WORKFLOW %s: update_status=%s", workflow.name, status)
+            workflow.update_status(job, info)
+
+            #: Fetch next set of tasks and update the worflow
+            iterable = workflow.next()
+
+            logger.info("WORKFLOW %s: update_status=%s",
+                        workflow.name, workflow.status)
 
             #: Save the status to the store and submit tasks
-            if status != Status.Running:
-                cls.store.update_status(workflow_id, status,
+            if workflow.status != Status.Running:
+                cls.store.update_status(workflow_id, workflow.status,
                                  completed=True)
             else:
-                iterable = workflow.next()
                 cls.notifier.notify(SCHEDULE_TASK, iterable, workflow_id,
                                     priority=workflow.priority)
-                cls.store.update_status(workflow_id, status)
+                cls.store.update_status(workflow_id, workflow.status)
 
     @classmethod
     def status(cls, workflow_id):

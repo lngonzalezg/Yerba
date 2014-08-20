@@ -91,7 +91,7 @@ class Job(object):
         self.args = arguments
         self.inputs = []
         self.outputs = []
-        self._status = 'scheduled'
+        self._status = SCHEDULED
         self.description = description
         self._info = {}
         self._errors = []
