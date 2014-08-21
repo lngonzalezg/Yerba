@@ -19,6 +19,8 @@ def status_name(code):
 indices = range(len(_status_types))
 Status = namedtuple('Status', ' '.join(_status_types))._make(indices)
 
+DONE_STATUS = frozenset([Status.Failed, Status.Completed, Status.Cancelled, Status.Stopped])
+
 _status_messages = {
     Status.Initialized: "The workflow {0} has been initalized",
     Status.Scheduled: "The workflow {0} has been scheduled.",

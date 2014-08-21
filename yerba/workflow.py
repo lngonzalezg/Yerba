@@ -276,6 +276,7 @@ class Workflow(object):
 
         #: Check that job returned successfully
         if info['returned'] != 0 or not job.completed():
+            self._failed()
             job.status = FAILED
             self.completed.append(job)
             self.status = core.Status.Failed
@@ -283,6 +284,10 @@ class Workflow(object):
 
         #: Update the status to completed
         job.status = COMPLETED
+
+        #: Check if the workflow is already in a finished state
+        if self.status in core.DONE_STATUS:
+            return self.status
 
         #: Check if the workflow finished
         if self._finished():
@@ -302,6 +307,10 @@ class Workflow(object):
         '''Return the next set of available jobs'''
         available = []
         skipped = []
+
+        #: Check if the workflow is already in a finished state
+        if self.status in core.DONE_STATUS:
+            return available
 
         for job in self.available:
             if job.completed():
@@ -374,13 +383,19 @@ class Workflow(object):
         for job in self.available:
             job.status = FAILED
             #FIXME: add workflow change events
-            log_not_run_job(self.log, job)
+            #: Update the workflow log
+            if self.log:
+                log_not_run_job(self.log, job)
 
     def _skip(self, job):
         '''Sets a job into a skipped state'''
         job.status = SKIPPED
         self.available.remove(job)
         self.completed.append(job)
+
+        #: Update the workflow log
+        if self.log:
+            log_skipped_job(self.log, job)
 
     def status_message(self):
         prefix = "WORKFLOW{0}: " % self.name
