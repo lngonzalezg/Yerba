@@ -27,36 +27,21 @@ CONFIG_PATHS = [
     os.path.abspath(os.path.join(SCRIPT_PATH, '../yerba.cfg')),
 ]
 
-def main(args=None):
-    cfg = RawConfigParser(DEFAULTS)
 
-    try:
-        CONFIG_PATHS.append(args['config'])
-    except KeyError:
-        pass
-    finally:
-        cfg.read(CONFIG_PATHS)
-
-    # Setup database and exit
-    if args.get('setup', False):
-        file_path = cfg.get('db', 'path')
-        index = cfg.get('db', 'start_index')
-        setup(file_path, index)
-        sys.exit(0)
-
+def setup_logger(cfg, name):
     # Setup Logging
     try:
-        logging_conf = cfg.get('yerba', 'logging')
+        logging_conf = cfg.get("%s-log" % name, 'logging')
         fileConfig(logging_conf)
-        logger = logging.getLogger('yerba')
+        logger = logging.getLogger(name)
     except NoSectionError:
-        logger = logging.getLogger('yerba')
+        logger = logging.getLogger(name)
         format_string = ('%(asctime)s %(name)s:%(lineno)s'
             '[%(levelname)s] %(message)s')
 
         fmt = logging.Formatter(format_string, datefmt='%m/%d/%Y %I:%M:%S')
 
-        filehandler = TimedRotatingFileHandler(cfg.get('yerba', 'log'),
+        filehandler = TimedRotatingFileHandler(cfg.get('yerba', "%s-log" % name),
                                                'midnight')
 
         filehandler.setLevel(logging.DEBUG)
@@ -70,6 +55,31 @@ def main(args=None):
         logger.addHandler(filehandler)
 
     logger.setLevel(getattr(logging, cfg.get('yerba', 'level').upper(), None))
+
+
+def main(args=None):
+    cfg = RawConfigParser(DEFAULTS)
+
+    try:
+        CONFIG_PATHS.append(args['config'])
+    except KeyError:
+        pass
+    finally:
+        cfg.read(CONFIG_PATHS)
+
+    #: Setup access log
+    setup_logger(cfg, 'access')
+
+    #: Setup yerba log
+    setup_logger(cfg, 'yerba')
+
+    # Setup database and exit
+    if args.get('setup', False):
+        file_path = cfg.get('db', 'path')
+        index = cfg.get('db', 'start_index')
+        setup(file_path, index)
+        sys.exit(0)
+
     listen_forever(cfg)
 
 if __name__ == "__main__":

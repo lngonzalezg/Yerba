@@ -14,6 +14,7 @@ from yerba.workflow import WorkflowError
 from yerba.workqueue import WorkQueueService
 
 logger = logging.getLogger('yerba')
+access = logging.getLogger('access')
 running = True
 decoder = json.JSONDecoder()
 
@@ -49,22 +50,20 @@ def listen_forever(config):
                 try:
                     data = socket.recv_string()
                     msg = decoder.decode(data)
-                    logger.debug("ZMQ: Recieved \n%s", pformat(msg))
+                    access.debug("ZMQ: Recieved \n%s", pformat(msg))
                 except Exception:
                     logger.exception("ZMQ: The message was not parsed")
 
                 if not msg:
-                    logger.info("The message was not recieved.")
+                    logger.warn("The message was not recieved.")
                 else:
                     try:
                         response = dispatch(msg)
                     except:
                         logger.exception("EXCEPTION")
 
-                logger.info("#### END REQUEST ####")
-
                 if not response:
-                    logger.info("Invalid request: %s", msg)
+                    logger.info("Invalid request")
                     response = {"status" : "Failed", "error": "Invalid response"}
 
                 try:
@@ -74,13 +73,13 @@ def listen_forever(config):
                     logger.exception("INVALID JSON RESPONSE:\n %s", pformat(response))
 
                 try:
-                    logger.info("Sending Response")
+                    access.info("Sending Response")
                     socket.send_unicode(message, flags=zmq.NOBLOCK)
                 except zmq.Again:
                     logger.exception("Failed to respond with response %s",
                         response)
                 finally:
-                    logger.info("Finished processing the response")
+                    access.info("Finished processing the response")
             else:
                 try:
                     ServiceManager.update()
@@ -102,19 +101,20 @@ def shutdown():
 #XXX: Add reporting information
 @route("health")
 def get_health(data):
-    logger.info("#### HEALTH CHECK #####")
+    access.info("#### HEALTH CHECK #####")
     return  {"status" : "OK" }
 
 @route("new")
 def create_workflow(data):
     '''Returns the id of a new workflow object'''
+    access.info("##### CREATING WORKFLOW #####")
     (workflow_id, status) = WorkflowManager.create()
     return { "status": status_name(status), "id": workflow_id }
 
 @route("schedule")
 def schedule_workflow(data):
     '''Returns the job id'''
-    logger.info("##### WORKFLOW SCHEDULING #####")
+    access.info("##### WORKFLOW SCHEDULING #####")
     (workflow_id, status, errors) = WorkflowManager.submit(data)
 
     return {
@@ -126,7 +126,7 @@ def schedule_workflow(data):
 @route("restart")
 def restart_workflow(data):
     '''Restart the job if it is running. Otherwise return NotFound'''
-    logger.info("##### WORKFLOW RESTART #####")
+    access.info("##### WORKFLOW RESTART #####")
     try:
         identity = data['id']
         status = WorkflowManager.restart(identity)
@@ -139,7 +139,7 @@ def restart_workflow(data):
 @route("cancel")
 def cancel_workflow(data):
     '''Cancels the job if it is running.'''
-    logger.info("##### WORKFLOW CANCELLATION #####")
+    access.info("##### WORKFLOW CANCELLATION #####")
     try:
         identity = data['id']
         status = WorkflowManager.cancel(identity)
@@ -151,6 +151,7 @@ def cancel_workflow(data):
 @route("workflows")
 def get_workflows(data):
     '''Return all matching workflows'''
+    access.info("##### FETCHING WORKFLOWS #####")
     ids = None
 
     if data:
@@ -168,7 +169,7 @@ def get_workflows(data):
 @route("get_status")
 def get_workflow_status(data):
     '''Gets the status of the workflow.'''
-    logger.info("##### WORKFLOW STATUS CHECK #####")
+    access.info("##### WORKFLOW STATUS CHECK #####")
     try:
         identity = data['id']
         (status, jobs) = WorkflowManager.status(identity)
