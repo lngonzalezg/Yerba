@@ -5,7 +5,7 @@ from os import getloadavg
 from time import time, sleep
 import json
 
-from yerba.core import Status, SCHEDULE_TASK, CANCEL_TASK
+from yerba.core import Status, status_name, SCHEDULE_TASK, CANCEL_TASK
 from yerba.db import Database, WorkflowStore
 from yerba.workflow import WorkflowError, Workflow
 from yerba.utils import ignored, meminfo
@@ -197,12 +197,11 @@ class WorkflowManager(object):
 
         try:
             workflow = Workflow.from_object(data)
-            logger.debug("WORKFLOW %s: submitted", workflow.name)
         except WorkflowError as e:
-            logger.exception("WORKFLOW: the workflow failed to be generated")
+            logger.exception("the workflow failed to be generated")
             return (None, Status.Error, e.errors)
         except Exception as e:
-            logger.exception("""WORKFLOW: An unexpected error occured during
+            logger.exception("""an unexpected error occured during
                             workflow generation""")
             return (None, Status.Error, None)
 
@@ -218,11 +217,11 @@ class WorkflowManager(object):
             (workflow_id, _, _, _, _, _, _, status) = workflow_found
 
             if workflow_id in cls.workflows and status == Status.Running:
-                logger.info("WORKFLOW %s: already runnning", workflow_id)
+                logger.info("workflow id=%s is already runnning", workflow_id)
                 return (workflow_id, status, None)
 
             if status == Status.Initialized:
-                logger.info("Updating existing workflow")
+                logger.info("updating workflow id=%s", workflow_id)
                 cls.store.update_workflow(workflow_id,
                     name=workflow.name, log=workflow.log, jobs=data['jobs'],
                     priority=workflow.priority)
@@ -247,7 +246,7 @@ class WorkflowManager(object):
         if jobs:
             cls.notifier.notify(SCHEDULE_TASK, jobs, workflow_id,
                                 priority=workflow.priority)
-            logger.info("WORKFLOW ID: %s", workflow_id)
+            logger.info("submitted workflow id=%s", workflow_id)
 
         return workflow.status
 
@@ -269,8 +268,8 @@ class WorkflowManager(object):
             #: Fetch next set of tasks and update the worflow
             iterable = workflow.next()
 
-            logger.info("WORKFLOW %s: update_status=%s",
-                        workflow.name, workflow.status)
+            logger.info("updating workflow id=%s status=%s",
+                        workflow.name, status_name(workflow.status))
 
             #: Save the status to the store and submit tasks
             if workflow.status != Status.Running:
@@ -329,12 +328,12 @@ class WorkflowManager(object):
 
         try:
             workflow = Workflow.from_object(data)
-            logger.debug("WORKFLOW %s: submitted", workflow.name)
+            logger.debug("restarting workflow name=%s", workflow.name)
         except WorkflowError as e:
-            logger.exception("WORKFLOW: the workflow failed to be generated")
+            logger.exception("the workflow failed to be generated")
             return Status.Error
         except Exception as e:
-            logger.exception("""WORKFLOW: An unexpected error occured during
+            logger.exception("""an unexpected error occured during
                             workflow generation""")
             return Status.Error
 
