@@ -313,7 +313,7 @@ class Workflow(object):
             return available
 
         for job in self.available:
-            if job.completed():
+            if job.outputs and job.completed():
                 skipped.append(job)
                 continue
 
