@@ -60,29 +60,36 @@ def log_job_info(log_file, job):
     description = '{0}\n'.format(job.description)
     body = msg.format(**job.info)
 
-    with open(log_file, 'a') as log_handle:
-        log_handle.write('#' * 25 + '\n')
-        log_handle.write(description)
-        log_handle.write(body)
-        log_handle.write('#' * 25 + '\n\n')
+    with utils.ignored(OSError):
+        os.mkdir(os.path.dirname(log_file))
+        with open(log_file, 'a') as log_handle:
+            log_handle.write('#' * 25 + '\n')
+            log_handle.write(description)
+            log_handle.write(body)
+            log_handle.write('#' * 25 + '\n\n')
 
 def log_skipped_job(log_file, job):
     '''Log a job that was skipped'''
-    with open(log_file, 'a') as log_handle:
-        log_handle.write('#' * 25 + '\n')
-        log_handle.write('{0}\n'.format(job.description))
-        log_handle.write("Job: %s\n" % str(job))
-        log_handle.write("Skipped: The analysis was previously generated.\n")
-        log_handle.write('#' * 25 + '\n\n')
+    with utils.ignored(OSError):
+        os.mkdir(os.path.dirname(log_file))
+        with open(log_file, 'a') as log_handle:
+            log_handle.write('#' * 25 + '\n')
+            log_handle.write('{0}\n'.format(job.description))
+            log_handle.write("Job: %s\n" % str(job))
+            log_handle.write("Skipped: The analysis was previously generated.\n")
+            log_handle.write('#' * 25 + '\n\n')
 
 def log_not_run_job(log_file, job):
     '''Log a job that could not be run'''
-    with open(log_file, 'a') as log_handle:
-        log_handle.write('#' * 25 + '\n')
-        log_handle.write('{0}\n'.format(job.description))
-        log_handle.write("Job: %s\n" % str(job))
-        log_handle.write("The job was not run.\n")
-        log_handle.write('#' * 25 + '\n\n')
+
+    with utils.ignored(OSError):
+        os.mkdir(os.path.dirname(log_file))
+        with open(log_file, 'a') as log_handle:
+            log_handle.write('#' * 25 + '\n')
+            log_handle.write('{0}\n'.format(job.description))
+            log_handle.write("Job: %s\n" % str(job))
+            log_handle.write("The job was not run.\n")
+            log_handle.write('#' * 25 + '\n\n')
 
 class Job(object):
     def __init__(self, cmd, script, arguments, description=''):
