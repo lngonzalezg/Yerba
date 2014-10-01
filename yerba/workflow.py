@@ -285,6 +285,7 @@ class Workflow(object):
         #: Check that job returned successfully
         if info['returned'] != 0 or not job.completed():
             job.status = FAILED
+            self._failed()
             self.completed.append(job)
             self.status = core.Status.Failed
             return self.status
