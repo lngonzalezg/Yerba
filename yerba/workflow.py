@@ -37,7 +37,8 @@ def _format_args(args):
     return argstring
 
 
-@utils.warn_on_exception(OSError, message="The job could not be written.")
+@utils.warn_on_exception(OSError, "The job could not be written to the log.",
+                         logger=logger)
 def log_job_info(log_file, job):
     '''Log the results of a job'''
     outputs = []
@@ -62,30 +63,29 @@ def log_job_info(log_file, job):
     description = '{0}\n'.format(job.description)
     body = msg.format(**job.info)
 
-    os.mkdir(os.path.dirname(log_file))
-    with open(log_file, 'a+') as log_handle:
+    with open(log_file, 'a') as log_handle:
         log_handle.write('#' * 25 + '\n')
         log_handle.write(description)
         log_handle.write(body)
         log_handle.write('#' * 25 + '\n\n')
 
-@utils.warn_on_exception(OSError, "The job could not be written.")
+@utils.warn_on_exception(OSError, "The job could not be written to the log.",
+                         logger=logger)
 def log_skipped_job(log_file, job):
     '''Log a job that was skipped'''
-    os.mkdir(os.path.dirname(log_file))
-    with open(log_file, 'a+') as log_handle:
+    with open(log_file, 'a') as log_handle:
         log_handle.write('#' * 25 + '\n')
         log_handle.write('{0}\n'.format(job.description))
         log_handle.write("Job: %s\n" % str(job))
         log_handle.write("Skipped: The analysis was previously generated.\n")
         log_handle.write('#' * 25 + '\n\n')
 
-@utils.warn_on_exception(OSError, "The job could not be written.")
+@utils.warn_on_exception(OSError, "The job could not be written to the log.",
+                         logger=logger)
 def log_not_run_job(log_file, job):
     '''Log a job that could not be run'''
 
-    os.mkdir(os.path.dirname(log_file))
-    with open(log_file, 'a+') as log_handle:
+    with open(log_file, 'a') as log_handle:
         log_handle.write('#' * 25 + '\n')
         log_handle.write('{0}\n'.format(job.description))
         log_handle.write("Job: %s\n" % str(job))
