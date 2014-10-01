@@ -36,6 +36,8 @@ def _format_args(args):
 
     return argstring
 
+
+@utils.warn_on_exception(OSError, message="The job could not be written.")
 def log_job_info(log_file, job):
     '''Log the results of a job'''
     outputs = []
@@ -60,36 +62,35 @@ def log_job_info(log_file, job):
     description = '{0}\n'.format(job.description)
     body = msg.format(**job.info)
 
-    with utils.ignored(OSError):
-        os.mkdir(os.path.dirname(log_file))
-        with open(log_file, 'a') as log_handle:
-            log_handle.write('#' * 25 + '\n')
-            log_handle.write(description)
-            log_handle.write(body)
-            log_handle.write('#' * 25 + '\n\n')
+    os.mkdir(os.path.dirname(log_file))
+    with open(log_file, 'a+') as log_handle:
+        log_handle.write('#' * 25 + '\n')
+        log_handle.write(description)
+        log_handle.write(body)
+        log_handle.write('#' * 25 + '\n\n')
 
+@utils.warn_on_exception(OSError, "The job could not be written.")
 def log_skipped_job(log_file, job):
     '''Log a job that was skipped'''
-    with utils.ignored(OSError):
-        os.mkdir(os.path.dirname(log_file))
-        with open(log_file, 'a') as log_handle:
-            log_handle.write('#' * 25 + '\n')
-            log_handle.write('{0}\n'.format(job.description))
-            log_handle.write("Job: %s\n" % str(job))
-            log_handle.write("Skipped: The analysis was previously generated.\n")
-            log_handle.write('#' * 25 + '\n\n')
+    os.mkdir(os.path.dirname(log_file))
+    with open(log_file, 'a+') as log_handle:
+        log_handle.write('#' * 25 + '\n')
+        log_handle.write('{0}\n'.format(job.description))
+        log_handle.write("Job: %s\n" % str(job))
+        log_handle.write("Skipped: The analysis was previously generated.\n")
+        log_handle.write('#' * 25 + '\n\n')
 
+@utils.warn_on_exception(OSError, "The job could not be written.")
 def log_not_run_job(log_file, job):
     '''Log a job that could not be run'''
 
-    with utils.ignored(OSError):
-        os.mkdir(os.path.dirname(log_file))
-        with open(log_file, 'a') as log_handle:
-            log_handle.write('#' * 25 + '\n')
-            log_handle.write('{0}\n'.format(job.description))
-            log_handle.write("Job: %s\n" % str(job))
-            log_handle.write("The job was not run.\n")
-            log_handle.write('#' * 25 + '\n\n')
+    os.mkdir(os.path.dirname(log_file))
+    with open(log_file, 'a+') as log_handle:
+        log_handle.write('#' * 25 + '\n')
+        log_handle.write('{0}\n'.format(job.description))
+        log_handle.write("Job: %s\n" % str(job))
+        log_handle.write("The job was not run.\n")
+        log_handle.write('#' * 25 + '\n\n')
 
 class Job(object):
     def __init__(self, cmd, script, arguments, description=''):
@@ -283,7 +284,6 @@ class Workflow(object):
 
         #: Check that job returned successfully
         if info['returned'] != 0 or not job.completed():
-            self._failed()
             job.status = FAILED
             self.completed.append(job)
             self.status = core.Status.Failed
@@ -427,7 +427,7 @@ class Workflow(object):
 
         name = workflow_object.get('name', 'unnamed')
         level = workflow_object.get('priority', 0)
-        logfile = workflow_object.get('logfile', None)
+        logfile = workflow_object.get('logfile')
 
         #: Create the directory to the log file
         with utils.ignored(OSError, AttributeError):

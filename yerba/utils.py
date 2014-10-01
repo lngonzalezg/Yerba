@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 from contextlib import contextmanager
+from functools import wraps
+import logging
 import os
 import UserDict
 
@@ -50,3 +52,18 @@ def is_empty(path):
         raise OSError(2, "No such file", path)
 
     return os.stat(path)[6] == 0
+
+def warn_on_exception(exception, message, logger=logging.getLogger()):
+    """
+    Logs a warning message to the log when the exception is raised
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            try:
+                func(*args, **kwargs)
+            except exception:
+                logger.warn(message)
+
+        return wrapper
+    return decorator
