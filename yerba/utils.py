@@ -53,7 +53,7 @@ def is_empty(path):
 
     return os.stat(path)[6] == 0
 
-def warn_on_exception(exception, message, logger=logging.getLogger()):
+def log_on_exception(exception, message, logger=logging.getLogger()):
     """
     Logs a warning message to the log when the exception is raised
     """
@@ -63,7 +63,7 @@ def warn_on_exception(exception, message, logger=logging.getLogger()):
             try:
                 func(*args, **kwargs)
             except exception:
-                logger.warn(message)
+                logger.exception(message)
 
         return wrapper
     return decorator

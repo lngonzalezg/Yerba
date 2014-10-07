@@ -37,7 +37,9 @@ def _format_args(args):
     return argstring
 
 
-@utils.warn_on_exception(OSError, "The job could not be written to the log.",
+@utils.log_on_exception(OSError, "The job could not be written to the log.",
+                         logger=logger)
+@utils.log_on_exception(IOError, "The job could not be written to the log.",
                          logger=logger)
 def log_job_info(log_file, job):
     '''Log the results of a job'''
@@ -69,7 +71,9 @@ def log_job_info(log_file, job):
         log_handle.write(body)
         log_handle.write('#' * 25 + '\n\n')
 
-@utils.warn_on_exception(OSError, "The job could not be written to the log.",
+@utils.log_on_exception(OSError, "The job could not be written to the log.",
+                         logger=logger)
+@utils.log_on_exception(IOError, "The job could not be written to the log.",
                          logger=logger)
 def log_skipped_job(log_file, job):
     '''Log a job that was skipped'''
@@ -80,7 +84,9 @@ def log_skipped_job(log_file, job):
         log_handle.write("Skipped: The analysis was previously generated.\n")
         log_handle.write('#' * 25 + '\n\n')
 
-@utils.warn_on_exception(OSError, "The job could not be written to the log.",
+@utils.log_on_exception(OSError, "The job could not be written to the log.",
+                         logger=logger)
+@utils.log_on_exception(IOError, "The job could not be written to the log.",
                          logger=logger)
 def log_not_run_job(log_file, job):
     '''Log a job that could not be run'''
