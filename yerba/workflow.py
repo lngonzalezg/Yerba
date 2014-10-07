@@ -432,7 +432,7 @@ class Workflow(object):
 
         #: Create the directory to the log file
         with utils.ignored(OSError, AttributeError):
-            os.mkdir(os.path.dirname(logfile))
+            os.makedirs(os.path.dirname(logfile))
 
         errors = []
 
