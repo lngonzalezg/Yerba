@@ -3,10 +3,10 @@ Yerba
 
 CoGe's Yerba is a distributed job management framework.
 
-Dependencies
-------------
+Third-party Dependencies
+------------------------
 
- * pyzmq
+ * [pyzmq](https://pypi.python.org/pypi/pyzmq)
  * [cctools](http://www3.nd.edu/~ccl/software/download.shtml)
 
 Installation
