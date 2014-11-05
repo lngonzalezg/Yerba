@@ -25,14 +25,14 @@ The following command will generate a new database.
 yerbad --config yerba.cfg --setup
 ```
 
-### Configure startup scripts
-The job engine comes with three init scripts *work_queue_pool*, *catalog_server*
- and *yerba*. These scripts should be placed into init.d
-directory and setup to start at boot time.
+### Install startup scripts and start job engine
+
+The job engine comes with three upstart scripts which will setup yerba to restart when the system is rebooted.
 
 ```bash
-sudo cp yerba work_queue_pool catalog_server /etc/init.d/
-sudo update-rc.d yerba defaults
-sudo update-rc.d catalog_server defaults
-sudo update-rc.d work_queue_pool defaults
+cd scripts
+sudo cp yerba.config work_queue_pool.config catalog_server.config /etc/init.d/
+sudo start yerba
+sudo start catalog_server
+sudo start work_queue_pool
 ```
