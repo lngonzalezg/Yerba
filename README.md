@@ -59,12 +59,34 @@ Initializes a new workflow and returns whether the creation was successful.
 ##### Create/Submit a workflow
 Creates a new workflow if not present otherwise submits the workflow. Returns whether the workflow was successfully submitted.
 
+###### Structure of a job
+__description__ - The description used to describe the job in the get status response.
+
+__cmd__ - The command that will be run by joining the cmd, script, and args into a command string.
+
+__script__ - The script that is to be used as part of the command string to run the job.
+
+__options__ - Optional arguments that change the behavior of how the workflow will complete.
+
+__args__ - A list of triples where the third option is a flag to indicate whether the argument should attempt to be shortened.
+
+__inputs__ - List of output dependencies that the job expects.
+
+__outputs__ - List of input dependencies that the job requires.
+
+__overwrite__ - A flag to indicate whether the job should be forced to be run.
+
 ###### Request
 ```json
 {
-  "id": "<workflow id>",
-  "status": "",
-  "errors": []
+  "request": "schedule",
+  "data": {
+    "name": "",
+    "id": "<optional id>",
+    "priority": "",
+    "logfile": "",
+    "jobs": ["<job1>", "<job_n>"]
+  }
 }
 ```
 ###### Response
@@ -82,7 +104,9 @@ Returns the status of a workflow specified.
 ```json
 {
   "request": "get_status",
-  "id": "status"
+  "data": {
+    "id": "status"
+  }
 }
 ```
 ###### Response
@@ -99,7 +123,9 @@ Returns the set of workflows who's ids are in the set of ids. If the set of ids 
 ```json
 {
   "request": "workflows",
-  "ids": ["<workflow_id_1>", "<workflow_id_2>"]
+  "data": {
+    "ids": ["<workflow_id_1>", "<workflow_id_2>"]
+  }
 }
 ```
 ###### Response
@@ -116,7 +142,9 @@ Attempts to restart the workflow and returns the status.
 ```json
 {
   "request": "restart",
-  "id": "<workflow_id>"
+  "data": {
+    "id": "<workflow_id>"
+  }
 }
 ```
 ###### Response
@@ -133,7 +161,9 @@ Attempts to cancel the workflow and returns the status.
 ```json
 {
   "request": "cancel",
-  "id": "<workflow_id>"
+  "data": {
+    "id": "<workflow_id>"
+  }
 }
 ```
 ###### Response
