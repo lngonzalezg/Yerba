@@ -105,7 +105,7 @@ Returns the status of a workflow specified.
 {
   "request": "get_status",
   "data": {
-    "id": "status"
+    "id": "<workflow_id>"
   }
 }
 ```
