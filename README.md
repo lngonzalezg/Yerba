@@ -59,6 +59,8 @@ Initializes a new workflow and returns whether the creation was successful.
 ##### Create/Submit a workflow
 Creates a new workflow if not present otherwise submits the workflow. Returns whether the workflow was successfully submitted.
 
+Given an optional id will attempt to update an existing workflow with the workflow given.
+
 ###### Structure of a job
 __description__ - The description used to describe the job in the get status response.
 
