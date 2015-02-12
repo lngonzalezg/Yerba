@@ -13,6 +13,7 @@ from yerba.services import Service
 
 logger = getLogger('yerba.workqueue')
 name = "yerba"
+MAX_OUTPUT = 65536
 
 def get_task_info(task):
     dateformat="%d/%m/%y at %I:%M:%S%p"
@@ -32,7 +33,7 @@ def get_task_info(task):
         'elapsed' : execution_time,
         'taskid' : task.id,
         'returned' : task.return_status,
-        'output' : repr(task.output),
+        'output' : repr(task.output[:MAX_OUTPUT]),
     }
 
 class WorkQueueService(Service):
