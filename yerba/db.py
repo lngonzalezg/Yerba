@@ -217,7 +217,7 @@ class WorkflowStore(object):
             query += " WHERE id IN ({ids})"   
             id_string = ",".join(set(str(workflow_id) for workflow_id in ids))
             cursor = self.database.execute(query.format(ids=id_string))
-        else if status:
+        elif status:
             query += " WHERE status=?"
             cursor = self.database.execute(status)
         else:
