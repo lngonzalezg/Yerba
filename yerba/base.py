@@ -156,8 +156,9 @@ def get_workflows(data):
 
     if data:
         ids = data.get('ids', [])
+        status = data.get('status', None)
 
-    workflows = WorkflowManager.get_workflows(ids)
+    workflows = WorkflowManager.get_workflows(ids, status)
     result = []
 
     for (workflow_id, name, start, stop, status, priority) in workflows:

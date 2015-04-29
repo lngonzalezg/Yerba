@@ -196,7 +196,7 @@ class WorkflowStore(object):
         self.database.execute(query, params)
 
 
-    def fetch(self, ids=None):
+    def fetch(self, ids=None, status=None):
         """
         Returns a subset of workflows
 
@@ -204,19 +204,23 @@ class WorkflowStore(object):
         of workflows with matching ids.
         """
 
-        if ids:
-            query = '''
-                SELECT id, name, submitted, completed, status, priority
-                FROM workflows WHERE id IN ({ids})
-            '''
-
-            id_string = ",".join(set(str(workflow_id) for workflow_id in ids))
-            cursor = self.database.execute(query.format(ids=id_string))
-        else:
-            query = '''
+        query = '''
                 SELECT id, name, submitted, completed, status, priority
                 FROM workflows
             '''
+
+        if ids and status:
+            query += " WHERE id IN ({ids}) AND status=?"
+            id_string = ",".join(set(str(workflow_id) for workflow_id in ids))
+            cursor = self.database.execute(query.format(ids=id_string), status)
+        elif ids:
+            query += " WHERE id IN ({ids})"   
+            id_string = ",".join(set(str(workflow_id) for workflow_id in ids))
+            cursor = self.database.execute(query.format(ids=id_string))
+        else if status:
+            query += " WHERE status=?"
+            cursor = self.database.execute(status)
+        else:
             cursor = self.database.execute(query)
 
         return cursor.fetchall()

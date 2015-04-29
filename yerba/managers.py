@@ -251,9 +251,9 @@ class WorkflowManager(object):
         return workflow.status
 
     @classmethod
-    def get_workflows(cls, ids):
+    def get_workflows(cls, ids, status):
         '''Returns all matching workflows in the job engine'''
-        return cls.store.fetch(ids)
+        return cls.store.fetch(ids, status)
 
     @classmethod
     def update(cls, workflow_id, job, info):
