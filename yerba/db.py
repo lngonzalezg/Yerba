@@ -3,7 +3,7 @@ from json import JSONEncoder
 from sqlite3 import connect, IntegrityError
 from time import time
 
-from yerba.core import Status
+from yerba.core import Status, status_code
 
 CREATE_TABLE_QUERY = '''
     CREATE TABLE IF NOT EXISTS workflows
@@ -195,7 +195,6 @@ class WorkflowStore(object):
         params = (Status.Stopped, time(), Status.Running)
         self.database.execute(query, params)
 
-
     def fetch(self, ids=None, status=None):
         """
         Returns a subset of workflows
@@ -210,16 +209,18 @@ class WorkflowStore(object):
             '''
 
         if ids and status:
-            query += " WHERE id IN ({ids}) AND status=?"
+            query += ' WHERE id IN ({ids}) AND status={status}'
             id_string = ",".join(set(str(workflow_id) for workflow_id in ids))
-            cursor = self.database.execute(query.format(ids=id_string), status)
+            status = status_code(status)
+            cursor = self.database.execute(query.format(ids=id_string, status=status))
         elif ids:
-            query += " WHERE id IN ({ids})"   
+            query += ' WHERE id IN ({ids})'   
             id_string = ",".join(set(str(workflow_id) for workflow_id in ids))
             cursor = self.database.execute(query.format(ids=id_string))
         elif status:
-            query += " WHERE status=?"
-            cursor = self.database.execute(status)
+            query += ' WHERE status=?'
+            status = status_code(status)
+            cursor = self.database.execute(query, (status,))
         else:
             cursor = self.database.execute(query)
 
