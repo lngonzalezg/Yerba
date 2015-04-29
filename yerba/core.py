@@ -19,6 +19,9 @@ def status_name(code):
 indices = range(len(_status_types))
 Status = namedtuple('Status', ' '.join(_status_types))._make(indices)
 
+def status_code(name):
+    return getattr(Status, name.capitalize())
+
 DONE_STATUS = frozenset([Status.Failed, Status.Completed, Status.Cancelled, Status.Stopped])
 
 _status_messages = {
@@ -35,7 +38,6 @@ _status_messages = {
 
 def status_message(name, code):
     return _status_messages[code].format(name)
-
 
 SCHEDULE_TASK = 'schedule'
 CANCEL_TASK = 'cancel'
