@@ -153,6 +153,7 @@ def get_workflows(data):
     '''Return all matching workflows'''
     access.info("##### FETCHING WORKFLOWS #####")
     ids = None
+    status = None
 
     if data:
         ids = data.get('ids', [])
