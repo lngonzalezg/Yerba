@@ -1,12 +1,16 @@
+# -*- coding: utf-8 -*-
+from datetime import datetime
 from logging import getLogger
-from functools import wraps
+from os import getloadavg
+from time import time, sleep
+import json
 
-import core
-import utils
-from workflow import generate_workflow, WorkflowHelper
+from yerba.core import Status, status_name, SCHEDULE_TASK, CANCEL_TASK
+from yerba.db import Database, WorkflowStore
+from yerba.workflow import WorkflowError, Workflow
+from yerba.utils import ignored, meminfo
 
 logger = getLogger('yerba.manager')
-SEPERATOR = '.'
 
 class ServiceManager(object):
     core = {}
@@ -27,24 +31,24 @@ class ServiceManager(object):
             logger.error("Service does not belong to a group.")
             return
 
-        key = SEPERATOR.join((service.group, service.name))
+        key = '.'.join((service.group, service.name))
 
         if key in cls.core:
-            logging.warn("This service already exists.")
+            logger.warn("This service already exists.")
         else:
             cls.core[key] = service
 
     @classmethod
     def deregister(cls, service):
         """Deregisters a service with the manager."""
-        key = SEPERATOR.join((service.group, service.name))
+        key = '.'.join((service.group, service.name))
 
         if key in cls.core:
-            del core[key]
+            del cls.core[key]
 
     @classmethod
     def get(cls, name, group):
-        key = SEPERATOR.join((group, name))
+        key = '.'.join((group, name))
 
         if key in cls.core:
             return cls.core[key]
@@ -57,6 +61,8 @@ class ServiceManager(object):
         for service in cls.core.values():
             service.initialize()
 
+        cls.refresh = 300
+        cls.previous = time()
         cls.RUNNING = True
 
     @classmethod
@@ -73,109 +79,271 @@ class ServiceManager(object):
 
         cls.RUNNING = False
 
+def report_state():
+    wq = ServiceManager.get("workqueue", "scheduler")
+
+    workflow_status = ["INTERNAL STATE CHECK\n----WORKFLOW STATUS--\n"]
+    for (workflow_id, workflow) in WorkflowManager.workflows.items():
+        workflow_status.append(workflow.status_message())
+
+    stats = wq.queue.stats
+
+    if len(workflow_status) < 2:
+        workflow_status.append("--No workflows found\n")
+
+    mem = meminfo()
+
+
+    msg = ("\n---- System Info---\n"
+    "--CPU LOAD: {} {} {}\n"
+    "--Total Memory Avaible {}\n"
+    "--Memory Free {}\n"
+    "---- Work Queue Info --\n"
+    "--The work queue started on {}\n"
+    "--The total time sending data to workers is {}\n"
+    "--The total time spent recieving data from the workers is {}\n"
+    "--The total number of MB sent is {}\n"
+    "--The total number of MB recieved is {}\n"
+    "--The total number of workers joined {}\n"
+    "--The total number of workers removed is {}\n"
+    "--The total number of tasks completed is {}\n"
+    "--The total number of tasks dispatched is {}\n"
+    "----- Task info --\n"
+    "--There are {} tasks waiting\n"
+    "--There are {} tasks completed\n"
+    "--There are {} tasks running\n"
+    "---- Worker info --\n"
+    "--There are {} workers initializing\n"
+    "--There are {} workers ready\n"
+    "--There are {} workers busy\n"
+    "--There are {} workers full\n")
+
+    dateformat="%d/%m/%y at %I:%M:%S%p"
+
+    MICROSEC_PER_SECOND = 1000000.0
+    BYTES_PER_MEGABYTE = 1048576.0
+
+    dt1 = datetime.fromtimestamp(stats.start_time/ MICROSEC_PER_SECOND)
+    start_time = dt1.strftime(dateformat)
+
+    try:
+        load1, load5, load15 = getloadavg()
+    except:
+        load1, load5, load15 = 0, 0, 0
+
+    workqueue_status = msg.format(
+        load1,
+        load5,
+        load15,
+        mem["MemTotal"],
+        mem["MemFree"],
+        start_time,
+        stats.total_send_time,
+        stats.total_receive_time,
+        stats.total_bytes_sent / BYTES_PER_MEGABYTE,
+        stats.total_bytes_received / BYTES_PER_MEGABYTE,
+        stats.total_workers_joined,
+        stats.total_workers_removed,
+        stats.total_tasks_complete,
+        stats.total_tasks_dispatched,
+        stats.tasks_waiting,
+        stats.tasks_complete,
+        stats.tasks_running,
+        stats.workers_init,
+        stats.workers_ready,
+        stats.workers_busy,
+        stats.workers_full)
+
+    status = "".join([workqueue_status, "".join(workflow_status)])
+    logger.debug(status)
+    sleep(1)
+
+
 class WorkflowManager(object):
+    database = Database()
+    store = None
     workflows = {}
+    notifier = None
 
     @classmethod
-    def submit(cls, json):
-        '''Submits workflows to be scheduled'''
+    def set_notifier(cls, notifier):
+        '''Sets the notifier object'''
+        cls.notifier = notifier
+
+    @classmethod
+    def connect(cls, filename):
+        '''Connect to workflow database'''
+        cls.database.connect(filename)
+        cls.store = WorkflowStore(cls.database)
+
+    @classmethod
+    def create(cls, workflow=None, jobs_object=None, status=Status.Initialized):
+        '''Adds a new workflow to the database'''
+
+        if workflow and jobs_object:
+            workflow_id = cls.store.add_workflow(
+                name=workflow.name, log=workflow.log, jobs=jobs_object,
+                status=status, priority=workflow.priority)
+        else:
+            workflow_id = cls.store.add_workflow(status=status)
+
+        logger.info("Generating new workflow")
+        return (workflow_id, status)
+
+    @classmethod
+    def submit(cls, data):
+        '''Generate and schedule the workflow to be run'''
+        workflow_id = data.get('id', None)
+
         try:
-            (id, workflow) = generate_workflow(json)
-            logger.debug("%s - %s workflow submitted to the manager", workflow.name, id)
-        except (JobError, WorkflowError):
-            logger.exception("The workflow could not be generated.")
-            return core.Status.Error
-        except Exception:
-            logger.exception("An unexpected error has occured")
-            return core.Status.Error
+            workflow = Workflow.from_object(data)
+        except WorkflowError as e:
+            logger.exception("the workflow failed to be generated")
+            return (None, Status.Error, e.errors)
+        except Exception as e:
+            logger.exception("""an unexpected error occured during
+                            workflow generation""")
+            return (None, Status.Error, None)
 
-        cls.workflows[id] = workflow
-        items = []
+        # Check if the id was given otherwise try to find the workflow
+        # Create a new entry if the workflow was not found
+        # This allows a workflow to be unique and reusable
+        if workflow_id:
+            workflow_found = cls.store.get_workflow(workflow_id)
+        else:
+            workflow_found = cls.store.find_workflow(data['jobs'])
 
-        for job in workflow.jobs:
-            if job.completed():
-                job.status = 'skipped'
-            elif job.ready():
-                job.status = 'running'
-                items.append(job)
-            else:
-                job.status = 'scheduled'
+        if workflow_found:
+            (workflow_id, _, _, _, _, _, _, status) = workflow_found
 
-        scheduler = ServiceManager.get("workqueue", "scheduler")
-        scheduler.schedule(items, id, priority=workflow.priority)
+            if workflow_id in cls.workflows and status == Status.Running:
+                logger.info("workflow id=%s is already runnning", workflow_id)
+                return (workflow_id, status, None)
 
-        return core.Status.Scheduled
+            if status == Status.Initialized:
+                logger.info("updating workflow id=%s", workflow_id)
+                cls.store.update_workflow(workflow_id,
+                    name=workflow.name, log=workflow.log, jobs=data['jobs'],
+                    priority=workflow.priority)
+        else:
+
+            (workflow_id, _) = cls.create(workflow=workflow,
+                                          jobs_object=data['jobs'])
+
+        cls.workflows[workflow_id] = workflow
+        scheduled_status = cls.schedule(workflow_id, workflow)
+
+        return (workflow_id, scheduled_status, None)
 
     @classmethod
-    def fetch(cls, id):
-        '''Gets the next set of jobs to be run.'''
-        iterable = []
+    def schedule(cls, workflow_id, workflow):
+        '''Schedules a workflow by its id'''
 
-        with utils.ignored(KeyError):
-            workflow_helper = WorkflowHelper(cls.workflows[id])
-            iterable = workflow_helper.waiting()
+        jobs = workflow.next()
+        cls.store.update_status(workflow_id, workflow.status)
 
-            for job in iterable:
-                job.status = 'running'
+        #: Submit any jobs to the queue
+        if jobs:
+            cls.notifier.notify(SCHEDULE_TASK, jobs, workflow_id,
+                                priority=workflow.priority)
+            logger.info("submitted workflow id=%s", workflow_id)
 
-        return iterable
+        return workflow.status
 
     @classmethod
-    def update(cls, id, job, info):
+    def get_workflows(cls, ids, status):
+        '''Returns all matching workflows in the job engine'''
+        return cls.store.fetch(ids, status)
+
+    @classmethod
+    def update(cls, workflow_id, job, info):
         '''Updates the job with details'''
-        with utils.ignored(KeyError):
-            workflow = cls.workflows[id]
-            workflow_helper = WorkflowHelper(workflow)
-            workflow_helper.add_job_info(job, info)
-            logger.info("Updating %s - %s workflow job %s", id, workflow.name, job)
+
+        with ignored(KeyError):
+            workflow = cls.workflows[workflow_id]
+
+            #: Update the status of the workflow
+            workflow.update_status(job, info)
+
+            #: Fetch next set of tasks and update the worflow
+            iterable = workflow.next()
+
+            logger.info("updating workflow id=%s status=%s",
+                        workflow.name, status_name(workflow.status))
+
+            #: Save the status to the store and submit tasks
+            if workflow.status != Status.Running:
+                cls.store.update_status(workflow_id, workflow.status,
+                                 completed=True)
+            else:
+                cls.notifier.notify(SCHEDULE_TASK, iterable, workflow_id,
+                                    priority=workflow.priority)
+                cls.store.update_status(workflow_id, workflow.status)
 
     @classmethod
-    def status(cls, id):
+    def status(cls, workflow_id):
         '''Gets the status of the current workflow.'''
-        status = core.Status.NotFound
-        data = []
+        status = cls.store.get_status(workflow_id)
+        jobs = []
 
-        with utils.ignored(KeyError):
-            workflow_helper = WorkflowHelper(cls.workflows[id])
-            logger.debug("id: %s, %s", id, workflow_helper.message())
+        with ignored(KeyError):
+            workflow = cls.workflows[int(workflow_id)]
+            jobs = workflow.state()
 
-            for job in workflow_helper.workflow.jobs:
-                if job.status == 'running' and job.completed():
-                    job.status = 'completed'
-                elif job.failed():
-                    job.status = 'failed'
-
-                data.append({
-                    'status' : job.status,
-                    'description' : job.description,
-                })
-
-            status = workflow_helper.status()
-
-            if status != core.Status.Running:
-                workflow_helper.log()
-                cls.workflows[id]._logged = True
-
-        return (status, data)
+        return (status, jobs)
 
     @classmethod
-    def cancel(cls, id):
+    def cancel(cls, workflow_id):
         '''Cancel the workflow from being run.'''
-        status = core.Status.NotFound
+        status = Status.NotFound
 
-        with utils.ignored(KeyError):
-            scheduler = ServiceManager.get("workqueue", "scheduler")
-            scheduler.cancel(id)
-            workflow = cls.workflows[id]
+        with ignored(KeyError):
+            workflow = cls.workflows[int(workflow_id)]
+            logger.info(('WORKQUEUE %s: the workflow has been requested'
+            'to be cancelled'), workflow.name)
 
-            for job in workflow.jobs:
-                if job.status == 'waiting':
-                    job.status = 'cancelled'
-                elif job.status == 'running':
-                    job.status = 'cancelled'
-                elif job.status == 'scheduled':
-                    job.status = 'cancelled'
+            workflow.cancel()
+            status = workflow.status
 
-            status = core.Status.Cancelled
+            cls.store.update_status(int(workflow_id), status, completed=True)
+            cls.notifier.notify(CANCEL_TASK, int(workflow_id))
 
         return status
+
+    @classmethod
+    def restart(cls, workflow_id):
+        workflow_found = cls.store.get_workflow(workflow_id)
+
+        if not workflow_found:
+            return Status.NotFound
+
+        (wid, name, log, jobs, _, _, priority, _) = workflow_found
+
+        data = {
+            "name": name,
+            "priority": priority,
+            "logfile": log,
+            "jobs": json.loads(jobs)
+        }
+
+        try:
+            workflow = Workflow.from_object(data)
+            logger.debug("restarting workflow name=%s", workflow.name)
+        except WorkflowError as e:
+            logger.exception("the workflow failed to be generated")
+            return Status.Error
+        except Exception as e:
+            logger.exception("""an unexpected error occured during
+                            workflow generation""")
+            return Status.Error
+
+        cls.workflows[wid] = workflow
+        cls.store.restart_workflow(workflow_id)
+        return cls.schedule(wid, workflow)
+
+    @classmethod
+    def cleanup(cls):
+        """
+        Go through all Running jobs and set there status to stopped.
+        """
+        cls.store.stop_workflows()

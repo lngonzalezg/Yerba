@@ -1,4 +1,27 @@
 [DEFAULT]
+debug = True
+access-log = /opt/Yerba/log/access.log
+yerba-log = /opt/Yerba/log/yerbad.log
+
+[yerba-log]
+logging = /etc/yerba/logging.conf
+
+[access-log]
+logging = /etc/yerba/access.conf
+
+[yerba]
 port = 5151
-logging = '/etc/yerba/logging.conf'
-queue-prefix = test
+level = DEBUG
+
+[workqueue]
+catalog_server = localhost
+catalog_port = 1024
+project = coge-main
+log = /opt/Yerba/log/workqueue.log
+port = -1
+password = /etc/yerba/workqueue_pass
+debug = True
+
+[db]
+path = /opt/Yerba/workflows.db
+start_index = 100

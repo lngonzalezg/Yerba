@@ -1,47 +1,48 @@
 #!/usr/bin/env python
 import argparse
-import ConfigParser as configparser
 import logging
-import logging.handlers as loghandlers
 import os
 import sys
+from ConfigParser import RawConfigParser, NoSectionError
+from logging.config import fileConfig
+from logging.handlers import TimedRotatingFileHandler
 
-sys.path.insert(0, os.path.abspath('..'))
-from yerba import (yerba, utils)
+SCRIPT_PATH = os.path.dirname(__file__)
+sys.path.insert(0, os.path.abspath(os.path.join(SCRIPT_PATH, '..')))
+sys.path.insert(0, "/usr/local/lib/python2.7/site-packages")
 
-_path = os.path.dirname(__file__)
-_defaults = {
+from yerba.base import listen_forever
+from yerba.db import setup
+
+DEFAULTS = {
     'port' : 5151,
-    'logging' : os.path.join(_path, 'logging.conf'),
-    'logfile' : os.path.join(_path, 'yerba.log'),
-    'loglevel' : 'WARN',
-    'wqlog' : os.path.join(_path, 'workqueue.log'),
-    'queue_prefix' : 'yerba'
+    'log' : os.path.join(SCRIPT_PATH, 'yerba.log'),
+    'access' : os.path.join(SCRIPT_PATH, 'yerba.access.log'),
+    'level' : 'WARN',
+    'debug' : True
 }
 
-def main(args=None):
-    config = configparser.ConfigParser()
+CONFIG_PATHS = [
+    '/etc/yerba/yerba.cfg',
+    os.path.abspath(os.path.join(SCRIPT_PATH, '../yerba.cfg')),
+]
 
-    if args:
-        options = utils.ChainMap(args, _defaults)
-    else:
-        options = utils.ChainMap(_defaults)
 
+def setup_logger(cfg, name):
     # Setup Logging
-    if os.path.exists(options['logging']):
-        logging.config.fileConfig("logging.conf")
-        logger = logging.getLogger('yerba')
-    else:
-        logger = logging.getLogger('yerba')
-        logger.setLevel(options['loglevel'])
+    try:
+        logging_conf = cfg.get("%s-log" % name, 'logging')
+        fileConfig(logging_conf)
+        logger = logging.getLogger(name)
+    except NoSectionError:
+        logger = logging.getLogger(name)
+        format_string = ('%(asctime)s %(name)s:%(lineno)s'
+            '[%(levelname)s] %(message)s')
 
-        fmt = logging.Formatter(
-            '%(asctime)s %(name)s [%(levelname)s] %(message)s',
-             datefmt='%m/%d/%Y %I:%M:%S')
+        fmt = logging.Formatter(format_string, datefmt='%m/%d/%Y %I:%M:%S')
 
-
-        filehandler = loghandlers.TimedRotatingFileHandler(
-                options['logfile'], 'midnight')
+        filehandler = TimedRotatingFileHandler(cfg.get('yerba', "%s-log" % name),
+                                               'midnight')
 
         filehandler.setLevel(logging.DEBUG)
         filehandler.setFormatter(fmt)
@@ -50,15 +51,36 @@ def main(args=None):
         streamhandler.setLevel(logging.DEBUG)
         streamhandler.setFormatter(fmt)
 
-        bufferhandler = loghandlers.MemoryHandler(1024, target=filehandler)
-        bufferhandler.setLevel(logging.DEBUG)
-        bufferhandler.setFormatter(fmt)
-
         logger.addHandler(streamhandler)
-        logger.addHandler(bufferhandler)
+        logger.addHandler(filehandler)
 
-    logger.setLevel(getattr(logging, options['loglevel'].upper(), None))
-    yerba.listen_forever(port = options['port'], options = options)
+    logger.setLevel(getattr(logging, cfg.get('yerba', 'level').upper(), None))
+
+
+def main(args=None):
+    cfg = RawConfigParser(DEFAULTS)
+
+    try:
+        CONFIG_PATHS.append(args['config'])
+    except KeyError:
+        pass
+    finally:
+        cfg.read(CONFIG_PATHS)
+
+    #: Setup access log
+    setup_logger(cfg, 'access')
+
+    #: Setup yerba log
+    setup_logger(cfg, 'yerba')
+
+    # Setup database and exit
+    if args.get('setup', False):
+        file_path = cfg.get('db', 'path')
+        index = cfg.get('db', 'start_index')
+        setup(file_path, index)
+        sys.exit(0)
+
+    listen_forever(cfg)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -67,5 +89,7 @@ if __name__ == "__main__":
     parser.add_argument('--loglevel')
     parser.add_argument('--logging')
     parser.add_argument('--queue-prefix')
+    parser.add_argument('--config')
+    parser.add_argument('--setup', action='store_true')
 
     main(args = {k:v for k, v in vars(parser.parse_args()).items() if v})

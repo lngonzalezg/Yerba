@@ -1,38 +1,67 @@
-from logging import getLogger
-from collections import namedtuple
-
-logger = getLogger('yerba.services')
+# -*- coding: utf-8 -*-
+from collections import namedtuple, defaultdict
 
 _status_types = [
-    "NotFound",
-    "Waiting",
+    "Initialized",
+    "Scheduled",
     "Running",
     "Completed",
-    "Failed",
     "Cancelled",
-    "Terminated",
-    "Scheduled",
-    "Attached",
+    "Stopped",
+    "Failed",
+    "NotFound",
     "Error"
 ]
 
 def status_name(code):
     return _status_types[code]
 
-Status = namedtuple('Status', ' '.join(_status_types))._make(range(0, 10))
+indices = range(len(_status_types))
+Status = namedtuple('Status', ' '.join(_status_types))._make(indices)
+
+def status_code(name):
+    return getattr(Status, name.capitalize())
+
+DONE_STATUS = frozenset([Status.Failed, Status.Completed, Status.Cancelled, Status.Stopped])
 
 _status_messages = {
-    Status.Attached: "The workflow {0} is Attached",
+    Status.Initialized: "The workflow {0} has been initalized",
     Status.Scheduled: "The workflow {0} has been scheduled.",
+    Status.Running: "The workflow {0} is running.",
     Status.Completed: "The workflow {0} was completed.",
-    Status.Terminated: "The workflow {0} has been terminated.",
     Status.Cancelled: "The workflow {0} has been cancelled.",
+    Status.Stopped: "The workflow {0} has been stopped.",
     Status.Failed: "The workflow {0} failed.",
-    Status.Error: "The workflow {0} has errors.",
     Status.NotFound: "The workflow {0} was not found.",
-    Status.Running: "The workflow {0} is running."
+    Status.Error: "The workflow {0} has errors."
 }
 
 def status_message(name, code):
     return _status_messages[code].format(name)
 
+SCHEDULE_TASK = 'schedule'
+CANCEL_TASK = 'cancel'
+TASK_DONE = 'done'
+
+class EventNotifier(object):
+    def __init__(self):
+        self.events = defaultdict(list)
+
+    def notify(self, event, *args, **kw):
+        '''
+        Notify all registered recievers for the event
+        '''
+        for callback in self.events[event]:
+            callback(*args, **kw)
+
+    def register(self, event, reciever):
+        '''
+        Register the reciever to be notified for the event
+        '''
+        self.events[event].append(reciever)
+
+    def unregister(self, event, receiver):
+        '''
+        Unregister the reciever from event
+        '''
+        self.events[event].remove(receiver)

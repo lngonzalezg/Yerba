@@ -1,9 +1,11 @@
 #!/usr/bin/env python
+import argparse
 import itertools
 import os
 import subprocess
-
-
+import sys
+import time
+from pprint import pprint
 import zmq
 
 _path = os.path.dirname(__file__)
@@ -14,31 +16,61 @@ _defaults = {
     'timeout' : 1000
 }
 
-def main():
+def main(options=None):
+    if not options:
+        print("ERROR: No options were provided")
+        sys.exit(1)
+
     context = zmq.Context()
     socket = context.socket(zmq.REQ)
     socket.setsockopt(zmq.LINGER, 0)
     socket.connect(_defaults['connection'])
 
-    request = {
-        'request' : 'get_status',
-        'data' : { 'id' : 1 }
-    }
+    request = {'data' : {}}
+
+    if options.cmd == 'health':
+        request['request'] = 'health'
+    elif options.cmd == 'shutdown':
+        request['request'] = 'shutdown'
+    elif options.cmd == 'status':
+        request['request'] = 'get_status'
+        request['data']['id'] = options.identifier
+    elif options.cmd == 'cancel':
+        request['request'] = 'cancel'
+        request['data']['id'] = options.identifier
+    elif options.cmd == 'restart':
+        request['request'] = 'restart'
+        request['data']['id'] = options.identifier
+    else:
+        request['request'] = 'health'
+
 
     poller = zmq.Poller()
     poller.register(socket, zmq.POLLIN)
     counter = itertools.count()
+    count = counter.next()
 
     socket.send_json(request, zmq.NOBLOCK)
 
     result = None
 
     while _defaults['max_attempts'] > counter.next() and not result:
+        time.sleep(1)
+
         if socket in dict(poller.poll(timeout=_defaults['timeout'])):
             result = socket.recv_json(flags=zmq.NOBLOCK)
+        else:
+            try:
+                socket.send_json(request, zmq.NOBLOCK)
+            except zmq.ZMQError:
+                pass
 
     if not result:
         print("Unable to connect to the job engine.")
+        sys.exit(1)
+
+    print("STATUS: {status}".format(**result))
+    pprint(result)
 
         if os.path.exists(_defaults["log"]):
             print subprocess.check_output(["tail", "-n", "150", _defaults["log"]])
@@ -47,4 +79,48 @@ def main():
     context.term()
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(
+        description="""yerba is a command line front end to the Yerba Job engine.
+        The available features include: monitoring the job engine, inspecting workflows,
+        maintaining workflows and controlling the job engine.
+        """)
+
+    parser.add_argument('--version', action='version', version="%(prog)s 0.3.2")
+
+    subparser = parser.add_subparsers(title="commands", dest='cmd',
+            description="List of available commands:")
+    #
+    # WORKFLOW COMMANDS
+    #
+
+    #RESTART
+    restart = subparser.add_parser('restart', conflict_handler='resolve',
+        help="restart an existing workflow")
+    restart.add_argument('identifier',
+        help="identifier of the workflow to be cancelled")
+    restart.add_argument('--regenerate', action='store_true',
+        help="regenerates the entire workflow from scratch")
+
+    #CANCEL
+    cancel = subparser.add_parser('cancel', conflict_handler='resolve',
+        help="cancel an existing workflow")
+    cancel.add_argument('identifier',
+        help="identifier of the workflow to be cancelled")
+
+    # STATUS
+    status = subparser.add_parser('status', conflict_handler='resolve',
+        help="get the status of an existing workflow")
+    status.add_argument('identifier',
+        help="the identifier of the scheduled workflow")
+
+    #
+    # SERVER COMMANDS
+    #
+
+    # HEALTH
+    health = subparser.add_parser('health', help="get the health of the job engine")
+
+    # SHUTDOWN
+    shutdown = subparser.add_parser('shutdown', help="cancel all workflows and quit")
+
+    main(options = parser.parse_args())
