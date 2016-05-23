@@ -5,7 +5,7 @@
 
     A is a distributed job management framework
 
-    Copyright (c) 2014 CoGe
+    Copyright (c) 2014-2016 CoGe
     License: MIT, refer to LICENSE for details
 """
 
