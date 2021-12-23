@@ -43,6 +43,7 @@ The job engine comes with three systemd service files
 ```bash
 cd scropt/systemd
 sudo cp catalog_server.service /etc/systemd/system/
+```
 
 ### Requests
 This is the list of valid requests that can be submitted to Yerba.
