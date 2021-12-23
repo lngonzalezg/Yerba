@@ -187,6 +187,9 @@ class Job(object):
         status = [
             ['status', self.status],
             ['description', self.description],
+            ['cmd',         self.cmd + self.args],  # mdb added 10/13/16
+            ['inputs',      self.inputs],           # mdb added 10/13/16
+            ['outputs',     self.outputs]           # mdb added 10/13/16
         ]
 
         status.extend(self.info.items())

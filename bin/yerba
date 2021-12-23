@@ -72,8 +72,8 @@ def main(options=None):
     print("STATUS: {status}".format(**result))
     pprint(result)
 
-        if os.path.exists(_defaults["log"]):
-            print subprocess.check_output(["tail", "-n", "150", _defaults["log"]])
+    if os.path.exists(_defaults["log"]):
+        print subprocess.check_output(["tail", "-n", "150", _defaults["log"]])
 
     socket.close()
     context.term()
