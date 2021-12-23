@@ -27,6 +27,7 @@ yerbad --config yerba.cfg --setup
 
 ### Install startup scripts and start job engine
 
+#### Using upstart
 The job engine comes with three upstart scripts which will setup yerba to restart when the system is rebooted.
 
 ```bash
