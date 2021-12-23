@@ -31,7 +31,7 @@ The job engine comes with three upstart scripts which will setup yerba to restar
 
 ```bash
 cd scripts
-sudo cp yerba.config work_queue_pool.config catalog_server.config /etc/init.d/
+sudo cp yerba.conf work_queue_pool.conf catalog_server.conf /etc/init/
 sudo start yerba
 sudo start catalog_server
 sudo start work_queue_pool
