@@ -43,6 +43,8 @@ The job engine comes with three systemd service files
 ```bash
 cd scropt/systemd
 sudo cp catalog_server.service /etc/systemd/system/
+
+sudo systemctl start catalog_server
 ```
 
 ### Requests
