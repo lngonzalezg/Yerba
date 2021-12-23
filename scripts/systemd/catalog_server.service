@@ -1,0 +1,7 @@
+[Unit]
+Description=CCTools catalog server
+
+[Service]
+Type=forking
+ExecStart=/opt/Yerba/scripts/catalog_server start 
+Restart=on-abnormal
