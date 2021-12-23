@@ -27,14 +27,24 @@ yerbad --config yerba.cfg --setup
 
 ### Install startup scripts and start job engine
 
+#### Using upstart
 The job engine comes with three upstart scripts which will setup yerba to restart when the system is rebooted.
 
 ```bash
-cd scripts
+cd scripts/upstart
 sudo cp yerba.conf work_queue_pool.conf catalog_server.conf /etc/init/
 sudo start yerba
 sudo start catalog_server
 sudo start work_queue_pool
+```
+
+#### Using systemd
+The job engine comes with three systemd service files
+```bash
+cd scropt/systemd
+sudo cp catalog_server.service /etc/systemd/system/
+
+sudo systemctl start catalog_server
 ```
 
 ### Requests
