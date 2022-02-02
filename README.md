@@ -40,8 +40,11 @@ sudo start work_queue_pool
 
 #### Using systemd
 The job engine comes with three systemd service files
+
+Yerba assumes that the install dir is /opt/Yerba, whose path is hard coded in the .service scripts
+
 ```bash
-cd scropt/systemd
+cd script/systemd
 sudo cp catalog_server.service /etc/systemd/system/
 
 sudo systemctl start catalog_server
