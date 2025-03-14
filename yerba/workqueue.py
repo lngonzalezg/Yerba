@@ -65,7 +65,7 @@ class WorkQueueService(Service):
         on the port. If an existing queue is running then the process will exit.
         '''
         try:
-            self.queue = wq.WorkQueue(name=self.project, catalog=True, port=-1)
+            self.queue = wq.WorkQueue(name=self.project, port=-1)
             self.queue.specify_catalog_server(self.catalog_server,
                     self.catalog_port)
             self.queue.specify_log(self.log)
